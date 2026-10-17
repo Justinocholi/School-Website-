@@ -166,18 +166,18 @@ const DEMO_PUBLISHED_RESULTS: ResultRecord[] = [
   },
 ];
 
-/**
- * Returns the currently authenticated student session.
- * Enforces server-side authentication check.
- */
 function isSupabaseConfigured(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
   return !url.includes('placeholder') && !key.includes('placeholder') && url.startsWith('http');
 }
 
+/**
+ * Returns the currently authenticated student session.
+ * Enforces server-side authentication check.
+ */
 export async function getAuthenticatedStudent(): Promise<StudentAuthContext | null> {
-  // 1. Check Supabase Auth
+  // 1. Check Supabase Auth if configured
   if (isSupabaseConfigured()) {
     try {
       const supabase = await createClient();
@@ -190,25 +190,26 @@ export async function getAuthenticatedStudent(): Promise<StudentAuthContext | nu
           .eq('user_id', user.id)
           .single();
 
-      if (student) {
-        const classObj = student.class as unknown as { id: string; name: string } | null;
-        return {
-          id: student.id,
-          student_id: student.student_id,
-          first_name: student.first_name,
-          last_name: student.last_name,
-          full_name: `${student.first_name} ${student.last_name}`,
-          class_name: classObj?.name || 'Unassigned',
-          class_id: classObj?.id,
-          admission_date: student.admission_date,
-          status: student.status,
-          user_id: user.id,
-          email: user.email,
-        };
+        if (student) {
+          const classObj = student.class as unknown as { id: string; name: string } | null;
+          return {
+            id: student.id,
+            student_id: student.student_id,
+            first_name: student.first_name,
+            last_name: student.last_name,
+            full_name: `${student.first_name} ${student.last_name}`,
+            class_name: classObj?.name || 'Unassigned',
+            class_id: classObj?.id,
+            admission_date: student.admission_date,
+            status: student.status,
+            user_id: user.id,
+            email: user.email,
+          };
+        }
       }
+    } catch {
+      // Supabase query error fallback
     }
-  } catch {
-    // If Supabase is offline or not configured
   }
 
   // 2. Check demo cookie session
@@ -302,37 +303,38 @@ export async function getStudentPublishedResults(studentDbId: string, termId?: s
     try {
       const supabase = await createClient();
       let query = supabase
-      .from('results')
-      .select(`
-        id, student_id, total_score, grade, remarks, status, published_at, created_at,
-        subject:subjects(id, name, code),
-        class:classes(id, name, level),
-        scores:result_scores(id, score, component:assessment_components(id, name, code, maximum_score))
-      `)
-      .eq('student_id', studentDbId)
-      .eq('status', 'published');
+        .from('results')
+        .select(`
+          id, student_id, total_score, grade, remarks, status, published_at, created_at,
+          subject:subjects(id, name, code),
+          class:classes(id, name, level),
+          scores:result_scores(id, score, component:assessment_components(id, name, code, maximum_score))
+        `)
+        .eq('student_id', studentDbId)
+        .eq('status', 'published');
 
-    if (termId) {
-      query = query.eq('term_id', termId);
+      if (termId) {
+        query = query.eq('term_id', termId);
+      }
+
+      const { data: dbResults } = await query;
+      const { data: dbTerms } = await supabase.from('terms').select('*').order('sequence_number');
+      const { data: dbSessions } = await supabase.from('academic_sessions').select('*');
+
+      if (dbResults && dbResults.length > 0) {
+        const typedResults = dbResults as unknown as ResultRecord[];
+        const performance = calculateTermPerformance(typedResults);
+        return {
+          results: typedResults,
+          performance,
+          terms: (dbTerms as unknown as TermRecord[]) || DEMO_TERMS,
+          sessions: (dbSessions as unknown as AcademicSession[]) || DEMO_SESSIONS,
+          selectedTermId: termId || (dbTerms?.[0]?.id || DEMO_TERMS[0].id),
+        };
+      }
+    } catch {
+      // Use demo fallback
     }
-
-    const { data: dbResults } = await query;
-    const { data: dbTerms } = await supabase.from('terms').select('*').order('sequence_number');
-    const { data: dbSessions } = await supabase.from('academic_sessions').select('*');
-
-    if (dbResults && dbResults.length > 0) {
-      const typedResults = dbResults as unknown as ResultRecord[];
-      const performance = calculateTermPerformance(typedResults);
-      return {
-        results: typedResults,
-        performance,
-        terms: (dbTerms as unknown as TermRecord[]) || DEMO_TERMS,
-        sessions: (dbSessions as unknown as AcademicSession[]) || DEMO_SESSIONS,
-        selectedTermId: termId || (dbTerms?.[0]?.id || DEMO_TERMS[0].id),
-      };
-    }
-  } catch {
-    // Use demo fallback
   }
 
   // Filter demo results
@@ -353,26 +355,28 @@ export async function getStudentPublishedResults(studentDbId: string, termId?: s
  * Access control boundary: strictly checks student ID matching.
  */
 export async function getStudentSingleResult(studentDbId: string, resultId: string): Promise<ResultRecord | null> {
-  try {
-    const supabase = await createClient();
-    const { data: result } = await supabase
-      .from('results')
-      .select(`
-        id, student_id, total_score, grade, remarks, status, published_at, created_at,
-        subject:subjects(id, name, code),
-        class:classes(id, name, level),
-        scores:result_scores(id, score, component:assessment_components(id, name, code, maximum_score))
-      `)
-      .eq('id', resultId)
-      .eq('student_id', studentDbId) // Access boundary
-      .eq('status', 'published')     // Only published
-      .single();
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data: result } = await supabase
+        .from('results')
+        .select(`
+          id, student_id, total_score, grade, remarks, status, published_at, created_at,
+          subject:subjects(id, name, code),
+          class:classes(id, name, level),
+          scores:result_scores(id, score, component:assessment_components(id, name, code, maximum_score))
+        `)
+        .eq('id', resultId)
+        .eq('student_id', studentDbId) // Access boundary
+        .eq('status', 'published')     // Only published
+        .single();
 
-    if (result) {
-      return result as unknown as ResultRecord;
+      if (result) {
+        return result as unknown as ResultRecord;
+      }
+    } catch {
+      // Fallback
     }
-  } catch {
-    // Fallback
   }
 
   // Check demo results
