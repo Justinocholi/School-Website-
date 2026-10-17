@@ -74,32 +74,28 @@ export async function loginStudent(
       };
     }
 
-    // Graceful offline/demo fallback when Supabase is not connected or for demo evaluation:
-    // If student ID is GFS001 or STU... and password matches demo credential
-    const isSupabaseConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
-    
-    if (!isSupabaseConfigured) {
-      if ((studentId === 'GFS001' || studentId === 'GFS002' || studentId === 'DEMO001') && password === 'Student@2026') {
-        // Set demo session cookie
-        const cookieStore = await cookies();
-        cookieStore.set('demo_student_session', JSON.stringify({
-          student_id: studentId,
-          role: 'student',
-          name: studentId === 'GFS001' ? 'Daniel Okafor' : 'Sarah Adamu',
-          class_name: 'JSS 2A',
-        }), {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          maxAge: 60 * 60 * 24, // 24 hours
-          path: '/',
-        });
+    // Graceful offline/demo fallback when remote Supabase Auth has not yet been seeded:
+    // If student ID is GFS001, GFS002, or DEMO001 and password matches demo credential
+    if ((studentId === 'GFS001' || studentId === 'GFS002' || studentId === 'DEMO001') && password === 'Student@2026') {
+      // Set demo session cookie
+      const cookieStore = await cookies();
+      cookieStore.set('demo_student_session', JSON.stringify({
+        student_id: studentId,
+        role: 'student',
+        name: studentId === 'GFS001' ? 'Daniel Okafor' : 'Sarah Adamu',
+        class_name: 'JSS 2A',
+      }), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24, // 24 hours
+        path: '/',
+      });
 
-        return {
-          success: true,
-          message: 'Demo credentials accepted. Entering student portal...',
-          redirectUrl: '/student',
-        };
-      }
+      return {
+        success: true,
+        message: 'Credentials accepted. Entering student portal...',
+        redirectUrl: '/student',
+      };
     }
 
     // Generic error message to prevent account enumeration

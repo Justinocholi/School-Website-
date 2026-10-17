@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import {
   GraduationCap,
   LayoutDashboard,
@@ -16,14 +17,23 @@ import {
   Shield,
   ExternalLink,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { getAuthenticatedAdmin, logoutAdmin } from '@/app/actions/admin-auth';
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const admin = await getAuthenticatedAdmin();
+
+  if (!admin) {
+    redirect('/admin-login');
+  }
+
   const navSections = [
     {
       title: 'Management',
@@ -126,12 +136,27 @@ export default function AdminLayout({
 
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <span className="text-xs font-bold text-gray-900 block leading-tight">School Administrator</span>
-              <span className="text-[11px] text-gray-500">admin@greenfieldcollege.edu</span>
+              <span className="text-xs font-bold text-gray-900 block leading-tight">
+                {admin.display_name}
+              </span>
+              <span className="text-[11px] text-gray-500 font-mono">
+                {admin.email}
+              </span>
             </div>
             <div className="w-8 h-8 rounded-full bg-emerald-800 text-white flex items-center justify-center font-bold text-xs">
               AD
             </div>
+            <form action={logoutAdmin}>
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                className="text-xs text-rose-700 hover:text-rose-800 hover:bg-rose-50 border-gray-200 ml-1"
+              >
+                <LogOut className="w-3.5 h-3.5 sm:mr-1" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </Button>
+            </form>
           </div>
         </header>
 
