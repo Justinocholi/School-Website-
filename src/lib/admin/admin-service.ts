@@ -188,28 +188,36 @@ let mockImportJobs: ImportJob[] = [
   },
 ];
 
-export async function getAdminOverviewStats() {
-  try {
-    const supabase = await createClient();
-    const { count: studentCount } = await supabase.from('students').select('*', { count: 'exact', head: true });
-    const { count: classCount } = await supabase.from('classes').select('*', { count: 'exact', head: true });
-    const { count: subjectCount } = await supabase.from('subjects').select('*', { count: 'exact', head: true });
-    const { count: pendingResultCount } = await supabase.from('results').select('*', { count: 'exact', head: true }).eq('status', 'pending_review');
-    const { count: publishedResultCount } = await supabase.from('results').select('*', { count: 'exact', head: true }).eq('status', 'published');
+function isSupabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  return !url.includes('placeholder') && !key.includes('placeholder') && url.startsWith('http');
+}
 
-    if (studentCount !== null && studentCount !== undefined) {
-      return {
-        totalStudents: studentCount,
-        totalClasses: classCount || mockClasses.length,
-        totalSubjects: subjectCount || mockSubjects.length,
-        pendingResults: pendingResultCount || 0,
-        publishedResults: publishedResultCount || 0,
-        recentImports: mockImportJobs.slice(0, 5),
-        recentActivity: mockAuditLogs.slice(0, 5),
-      };
+export async function getAdminOverviewStats() {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { count: studentCount } = await supabase.from('students').select('*', { count: 'exact', head: true });
+      const { count: classCount } = await supabase.from('classes').select('*', { count: 'exact', head: true });
+      const { count: subjectCount } = await supabase.from('subjects').select('*', { count: 'exact', head: true });
+      const { count: pendingResultCount } = await supabase.from('results').select('*', { count: 'exact', head: true }).eq('status', 'pending_review');
+      const { count: publishedResultCount } = await supabase.from('results').select('*', { count: 'exact', head: true }).eq('status', 'published');
+
+      if (studentCount !== null && studentCount !== undefined) {
+        return {
+          totalStudents: studentCount,
+          totalClasses: classCount || mockClasses.length,
+          totalSubjects: subjectCount || mockSubjects.length,
+          pendingResults: pendingResultCount || 0,
+          publishedResults: publishedResultCount || 0,
+          recentImports: mockImportJobs.slice(0, 5),
+          recentActivity: mockAuditLogs.slice(0, 5),
+        };
+      }
+    } catch {
+      // Database fallback
     }
-  } catch {
-    // Database fallback
   }
 
   return {

@@ -170,18 +170,25 @@ const DEMO_PUBLISHED_RESULTS: ResultRecord[] = [
  * Returns the currently authenticated student session.
  * Enforces server-side authentication check.
  */
+function isSupabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  return !url.includes('placeholder') && !key.includes('placeholder') && url.startsWith('http');
+}
+
 export async function getAuthenticatedStudent(): Promise<StudentAuthContext | null> {
   // 1. Check Supabase Auth
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
 
-    if (user) {
-      const { data: student } = await supabase
-        .from('students')
-        .select('id, student_id, first_name, last_name, other_names, admission_date, status, class:classes(id, name)')
-        .eq('user_id', user.id)
-        .single();
+      if (user) {
+        const { data: student } = await supabase
+          .from('students')
+          .select('id, student_id, first_name, last_name, other_names, admission_date, status, class:classes(id, name)')
+          .eq('user_id', user.id)
+          .single();
 
       if (student) {
         const classObj = student.class as unknown as { id: string; name: string } | null;
@@ -231,30 +238,32 @@ export async function getAuthenticatedStudent(): Promise<StudentAuthContext | nu
  */
 export async function getStudentDashboardData(studentId: string) {
   // Query Supabase if connected
-  try {
-    const supabase = await createClient();
-    const { data: results } = await supabase
-      .from('results')
-      .select('id, total_score, grade, status, subject:subjects(name)')
-      .eq('student_id', studentId)
-      .eq('status', 'published');
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data: results } = await supabase
+        .from('results')
+        .select('id, total_score, grade, status, subject:subjects(name)')
+        .eq('student_id', studentId)
+        .eq('status', 'published');
 
-    const { data: announcements } = await supabase
-      .from('announcements')
-      .select('*')
-      .eq('status', 'published')
-      .order('published_at', { ascending: false })
-      .limit(3);
+      const { data: announcements } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('status', 'published')
+        .order('published_at', { ascending: false })
+        .limit(3);
 
-    if (results && results.length > 0) {
-      return {
-        resultsCount: results.length,
-        announcements: announcements || [],
-        recentResults: results.slice(0, 5) as unknown as ResultRecord[],
-      };
+      if (results && results.length > 0) {
+        return {
+          resultsCount: results.length,
+          announcements: announcements || [],
+          recentResults: results.slice(0, 5) as unknown as ResultRecord[],
+        };
+      }
+    } catch {
+      // Fall back to demo data
     }
-  } catch {
-    // Fall back to demo data
   }
 
   return {
@@ -289,9 +298,10 @@ export async function getStudentPublishedResults(studentDbId: string, termId?: s
   selectedTermId: string;
 }> {
   // Supabase query
-  try {
-    const supabase = await createClient();
-    let query = supabase
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      let query = supabase
       .from('results')
       .select(`
         id, student_id, total_score, grade, remarks, status, published_at, created_at,
