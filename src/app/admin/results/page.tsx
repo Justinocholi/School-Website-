@@ -74,7 +74,23 @@ export default async function AdminResultsPage({
       {/* Filter Bar */}
       <Card className="border-gray-200">
         <CardContent className="p-4">
-          <form method="GET" className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+          <form method="GET" className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs">
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1">Academic Term</label>
+              <select
+                name="termId"
+                defaultValue={termId || ''}
+                className="w-full h-9 rounded-lg border border-gray-300 bg-white px-2.5 font-medium"
+              >
+                <option value="">All Terms</option>
+                {terms.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} {t.is_active ? '(Active)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="block text-[11px] font-semibold text-gray-500 mb-1">Class</label>
               <select
@@ -133,6 +149,7 @@ export default async function AdminResultsPage({
             <thead className="bg-slate-50 text-gray-600 uppercase border-b border-gray-200 text-xs">
               <tr>
                 <th className="py-3 px-4 font-semibold">Student</th>
+                <th className="py-3 px-4 font-semibold">Term</th>
                 <th className="py-3 px-4 font-semibold">Subject</th>
                 <th className="py-3 px-4 font-semibold">Class</th>
                 <th className="py-3 px-4 text-center font-semibold">Total Score</th>
@@ -144,7 +161,7 @@ export default async function AdminResultsPage({
             <tbody className="divide-y divide-gray-100 font-medium">
               {results.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-500 text-xs">
+                  <td colSpan={8} className="py-8 text-center text-gray-500 text-xs">
                     No results found matching your filters.
                   </td>
                 </tr>
@@ -158,6 +175,9 @@ export default async function AdminResultsPage({
                       <span className="text-gray-900 text-xs">
                         {r.student?.first_name} {r.student?.last_name}
                       </span>
+                    </td>
+                    <td className="py-3 px-4 text-xs font-semibold text-slate-700">
+                      {terms.find((t) => t.id === r.term_id)?.name || 'First Term'}
                     </td>
                     <td className="py-3 px-4 text-gray-900">
                       {r.subject?.name} <span className="text-gray-400 font-mono text-xs">({r.subject?.code})</span>

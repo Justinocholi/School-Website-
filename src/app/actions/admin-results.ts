@@ -41,6 +41,8 @@ export async function saveSingleResultAction(prevState: unknown, formData: FormD
     const record = await saveSingleResult(parsed.data);
     revalidatePath('/admin/results');
     revalidatePath('/admin/results/review');
+    revalidatePath('/student/results');
+    revalidatePath('/student');
     return {
       success: true,
       message: `Result for student ${parsed.data.student_id} saved successfully (${record.total_score} - Grade ${record.grade}).`,

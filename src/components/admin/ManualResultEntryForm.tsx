@@ -107,12 +107,12 @@ export function ManualResultEntryForm({
           <select
             name="term_id"
             required
-            defaultValue={terms[0]?.id || ''}
+            defaultValue={terms.find((t) => t.is_active)?.id || terms[0]?.id || ''}
             className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-medium"
           >
             {terms.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} (2026/2027)
+                {t.name} {t.is_active ? '— (Current Active Term)' : ''}
               </option>
             ))}
           </select>
@@ -184,12 +184,12 @@ export function ManualResultEntryForm({
             <label className="text-xs font-semibold text-gray-700">Workflow Status:</label>
             <select
               name="status"
-              defaultValue="pending_review"
-              className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs font-medium"
+              defaultValue="published"
+              className="h-9 rounded-md border border-gray-300 bg-white px-2.5 text-xs font-semibold text-emerald-800"
             >
-              <option value="draft">Save as Draft</option>
-              <option value="pending_review">Submit for Review</option>
-              <option value="published">Publish Immediately</option>
+              <option value="published">Publish Immediately (Visible to Student)</option>
+              <option value="pending_review">Submit for Review (Pending Approval)</option>
+              <option value="draft">Save as Draft (Private)</option>
             </select>
           </div>
         </div>

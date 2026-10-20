@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   addAdminClass,
   addAdminSubject,
+  setActiveAdminTerm,
 } from '@/lib/admin/admin-service';
 import { revalidatePath } from 'next/cache';
 
@@ -52,3 +53,19 @@ export async function createSubjectAction(prevState: unknown, formData: FormData
     return { success: false, message: err instanceof Error ? err.message : 'Error creating subject' };
   }
 }
+
+export async function setActiveTermAction(formData: FormData): Promise<void> {
+  const termId = formData.get('termId') as string;
+  if (!termId) return;
+  try {
+    await setActiveAdminTerm(termId);
+    revalidatePath('/admin/academic-sessions');
+    revalidatePath('/admin/results');
+    revalidatePath('/admin/results/entry');
+    revalidatePath('/student/results');
+    revalidatePath('/student');
+  } catch (err: unknown) {
+    console.error('Error in setActiveTermAction:', err);
+  }
+}
+

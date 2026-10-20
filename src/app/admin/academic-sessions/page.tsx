@@ -2,8 +2,10 @@ import React from 'react';
 import { Metadata } from 'next';
 import { Calendar, CheckCircle2, Clock } from 'lucide-react';
 import { getAdminSessions, getAdminTerms } from '@/lib/admin/admin-service';
+import { setActiveTermAction } from '@/app/actions/admin-academics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
   title: 'Academic Sessions & Terms',
@@ -73,20 +75,28 @@ export default async function AdminSessionsPage() {
           <CardContent className="p-0">
             <div className="divide-y divide-gray-100">
               {terms.map((t) => (
-                <div key={t.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
+                <div key={t.id} className="p-4 flex items-center justify-between hover:bg-slate-50 gap-3">
                   <div>
                     <h3 className="font-bold text-gray-900 text-sm">{t.name}</h3>
                     <p className="text-xs text-gray-500">Sequence #{t.sequence_number}</p>
                   </div>
-                  <div>
+                  <div className="flex items-center gap-2">
                     {t.is_active ? (
                       <Badge variant="success" className="text-xs">
                         Active Examination Period
                       </Badge>
                     ) : (
-                      <Badge variant="default" className="text-xs">
-                        Inactive / Pending
-                      </Badge>
+                      <form action={setActiveTermAction}>
+                        <input type="hidden" name="termId" value={t.id} />
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          size="sm"
+                          className="text-xs text-emerald-800 hover:text-emerald-900 hover:bg-emerald-50 border-emerald-200"
+                        >
+                          Set as Active Term
+                        </Button>
+                      </form>
                     )}
                   </div>
                 </div>

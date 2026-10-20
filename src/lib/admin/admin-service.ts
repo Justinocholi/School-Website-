@@ -7,104 +7,103 @@ import {
   AcademicSession,
   TermRecord,
   ResultRecord,
-  GradingScale,
   AuditLog,
   ImportJob,
   SchoolSettings,
 } from '@/types/database.types';
 import { evaluateGrade } from '@/lib/grading/grading-engine';
 
-// In-memory persistent state for local development when Supabase database is not yet hooked up
+// Canonical UUID-aligned mock state matching Supabase migrations and seeds
 let mockClasses: ClassRecord[] = [
-  { id: 'cls-1', name: 'JSS 1A', level: 'JSS 1', status: 'active', created_at: new Date().toISOString(), student_count: 24 },
-  { id: 'cls-2', name: 'JSS 1B', level: 'JSS 1', status: 'active', created_at: new Date().toISOString(), student_count: 22 },
-  { id: 'cls-3', name: 'JSS 2A', level: 'JSS 2', status: 'active', created_at: new Date().toISOString(), student_count: 26 },
-  { id: 'cls-4', name: 'JSS 3A', level: 'JSS 3', status: 'active', created_at: new Date().toISOString(), student_count: 20 },
-  { id: 'cls-5', name: 'SS 1 Science', level: 'SS 1', status: 'active', created_at: new Date().toISOString(), student_count: 28 },
-  { id: 'cls-6', name: 'SS 2 Science', level: 'SS 2', status: 'active', created_at: new Date().toISOString(), student_count: 25 },
+  { id: '77777777-7777-7777-7777-777777777771', name: 'JSS 1A', level: 'JSS 1', status: 'active', created_at: new Date().toISOString(), student_count: 24 },
+  { id: '77777777-7777-7777-7777-777777777772', name: 'JSS 1B', level: 'JSS 1', status: 'active', created_at: new Date().toISOString(), student_count: 22 },
+  { id: '77777777-7777-7777-7777-777777777773', name: 'JSS 2A', level: 'JSS 2', status: 'active', created_at: new Date().toISOString(), student_count: 26 },
+  { id: '77777777-7777-7777-7777-777777777774', name: 'JSS 3A', level: 'JSS 3', status: 'active', created_at: new Date().toISOString(), student_count: 20 },
+  { id: '77777777-7777-7777-7777-777777777775', name: 'SS 1 Science', level: 'SS 1', status: 'active', created_at: new Date().toISOString(), student_count: 28 },
+  { id: '77777777-7777-7777-7777-777777777776', name: 'SS 2 Science', level: 'SS 2', status: 'active', created_at: new Date().toISOString(), student_count: 25 },
 ];
 
 let mockSubjects: SubjectRecord[] = [
-  { id: 'sub-1', name: 'Mathematics', code: 'MTH', status: 'active', created_at: new Date().toISOString() },
-  { id: 'sub-2', name: 'English Language', code: 'ENG', status: 'active', created_at: new Date().toISOString() },
-  { id: 'sub-3', name: 'Basic Science', code: 'BSC', status: 'active', created_at: new Date().toISOString() },
-  { id: 'sub-4', name: 'Civic Education', code: 'CVE', status: 'active', created_at: new Date().toISOString() },
-  { id: 'sub-5', name: 'Physics', code: 'PHY', status: 'active', created_at: new Date().toISOString() },
-  { id: 'sub-6', name: 'Chemistry', code: 'CHM', status: 'active', created_at: new Date().toISOString() },
-  { id: 'sub-7', name: 'Biology', code: 'BIO', status: 'active', created_at: new Date().toISOString() },
+  { id: '88888888-8888-8888-8888-888888888881', name: 'Mathematics', code: 'MTH', status: 'active', created_at: new Date().toISOString() },
+  { id: '88888888-8888-8888-8888-888888888882', name: 'English Language', code: 'ENG', status: 'active', created_at: new Date().toISOString() },
+  { id: '88888888-8888-8888-8888-888888888883', name: 'Basic Science', code: 'BSC', status: 'active', created_at: new Date().toISOString() },
+  { id: '88888888-8888-8888-8888-888888888884', name: 'Civic Education', code: 'CVE', status: 'active', created_at: new Date().toISOString() },
+  { id: '88888888-8888-8888-8888-888888888885', name: 'Physics', code: 'PHY', status: 'active', created_at: new Date().toISOString() },
+  { id: '88888888-8888-8888-8888-888888888886', name: 'Chemistry', code: 'CHM', status: 'active', created_at: new Date().toISOString() },
+  { id: '88888888-8888-8888-8888-888888888887', name: 'Biology', code: 'BIO', status: 'active', created_at: new Date().toISOString() },
 ];
 
 let mockSessions: AcademicSession[] = [
-  { id: 'ses-1', name: '2026/2027', start_date: '2026-09-07', end_date: '2027-07-20', is_active: true, created_at: new Date().toISOString() },
-  { id: 'ses-2', name: '2025/2026', start_date: '2025-09-08', end_date: '2026-07-22', is_active: false, created_at: new Date().toISOString() },
+  { id: '11111111-1111-1111-1111-111111111111', name: '2026/2027', start_date: '2026-09-07', end_date: '2027-07-20', is_active: true, created_at: new Date().toISOString() },
+  { id: '22222222-2222-2222-2222-222222222222', name: '2025/2026', start_date: '2025-09-08', end_date: '2026-07-22', is_active: false, created_at: new Date().toISOString() },
 ];
 
 let mockTerms: TermRecord[] = [
-  { id: 'trm-1', academic_session_id: 'ses-1', name: 'First Term', sequence_number: 1, is_active: true, created_at: new Date().toISOString() },
-  { id: 'trm-2', academic_session_id: 'ses-1', name: 'Second Term', sequence_number: 2, is_active: false, created_at: new Date().toISOString() },
-  { id: 'trm-3', academic_session_id: 'ses-1', name: 'Third Term', sequence_number: 3, is_active: false, created_at: new Date().toISOString() },
+  { id: '33333333-3333-3333-3333-333333333331', academic_session_id: '11111111-1111-1111-1111-111111111111', name: 'First Term', sequence_number: 1, is_active: true, created_at: new Date().toISOString() },
+  { id: '33333333-3333-3333-3333-333333333332', academic_session_id: '11111111-1111-1111-1111-111111111111', name: 'Second Term', sequence_number: 2, is_active: false, created_at: new Date().toISOString() },
+  { id: '33333333-3333-3333-3333-333333333333', academic_session_id: '11111111-1111-1111-1111-111111111111', name: 'Third Term', sequence_number: 3, is_active: false, created_at: new Date().toISOString() },
 ];
 
 let mockStudents: StudentRecord[] = [
   {
-    id: 'std-1',
+    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     student_id: 'GFS001',
     first_name: 'Daniel',
     last_name: 'Okafor',
-    class_id: 'cls-3',
+    class_id: '77777777-7777-7777-7777-777777777773',
     admission_date: '2025-09-08',
     status: 'active',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    class: { id: 'cls-3', name: 'JSS 2A', level: 'JSS 2', status: 'active', created_at: '' },
+    class: { id: '77777777-7777-7777-7777-777777777773', name: 'JSS 2A', level: 'JSS 2', status: 'active', created_at: '' },
   },
   {
-    id: 'std-2',
+    id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     student_id: 'GFS002',
     first_name: 'Sarah',
     last_name: 'Adamu',
-    class_id: 'cls-3',
+    class_id: '77777777-7777-7777-7777-777777777773',
     admission_date: '2025-09-08',
     status: 'active',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    class: { id: 'cls-3', name: 'JSS 2A', level: 'JSS 2', status: 'active', created_at: '' },
+    class: { id: '77777777-7777-7777-7777-777777777773', name: 'JSS 2A', level: 'JSS 2', status: 'active', created_at: '' },
   },
   {
-    id: 'std-3',
+    id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     student_id: 'GFS003',
     first_name: 'Emeka',
     last_name: 'Chukwu',
-    class_id: 'cls-5',
+    class_id: '77777777-7777-7777-7777-777777777775',
     admission_date: '2026-09-01',
     status: 'active',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    class: { id: 'cls-5', name: 'SS 1 Science', level: 'SS 1', status: 'active', created_at: '' },
+    class: { id: '77777777-7777-7777-7777-777777777775', name: 'SS 1 Science', level: 'SS 1', status: 'active', created_at: '' },
   },
   {
-    id: 'std-4',
+    id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
     student_id: 'GFS004',
     first_name: 'Amina',
     last_name: 'Bello',
-    class_id: 'cls-1',
+    class_id: '77777777-7777-7777-7777-777777777771',
     admission_date: '2026-09-01',
     status: 'active',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    class: { id: 'cls-1', name: 'JSS 1A', level: 'JSS 1', status: 'active', created_at: '' },
+    class: { id: '77777777-7777-7777-7777-777777777771', name: 'JSS 1A', level: 'JSS 1', status: 'active', created_at: '' },
   },
 ];
 
 let mockResults: ResultRecord[] = [
   {
-    id: 'res-1',
-    student_id: 'std-1',
-    subject_id: 'sub-1',
-    term_id: 'trm-1',
-    class_id: 'cls-3',
+    id: 'c0000000-0000-0000-0000-000000000001',
+    student_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    subject_id: '88888888-8888-8888-8888-888888888881',
+    term_id: '33333333-3333-3333-3333-333333333331',
+    class_id: '77777777-7777-7777-7777-777777777773',
     status: 'published',
-    total_score: 87.0,
+    total_score: 86.5,
     grade: 'A',
     remarks: 'Distinction',
     published_at: new Date().toISOString(),
@@ -114,28 +113,8 @@ let mockResults: ResultRecord[] = [
     subject: mockSubjects[0],
     class: mockClasses[2],
     scores: [
-      { id: 'sc-1', result_id: 'res-1', assessment_component_id: 'ca', score: 27, component: { id: 'ca', name: 'CA', code: 'ca', maximum_score: 30, sequence_number: 1, is_active: true, created_at: '' } },
-      { id: 'sc-2', result_id: 'res-1', assessment_component_id: 'exam', score: 60, component: { id: 'exam', name: 'Exam', code: 'exam', maximum_score: 70, sequence_number: 2, is_active: true, created_at: '' } },
-    ],
-  },
-  {
-    id: 'res-2',
-    student_id: 'std-2',
-    subject_id: 'sub-1',
-    term_id: 'trm-1',
-    class_id: 'cls-3',
-    status: 'pending_review',
-    total_score: 74.5,
-    grade: 'B',
-    remarks: 'Very Good',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    student: mockStudents[1],
-    subject: mockSubjects[0],
-    class: mockClasses[2],
-    scores: [
-      { id: 'sc-3', result_id: 'res-2', assessment_component_id: 'ca', score: 24.5, component: { id: 'ca', name: 'CA', code: 'ca', maximum_score: 30, sequence_number: 1, is_active: true, created_at: '' } },
-      { id: 'sc-4', result_id: 'res-2', assessment_component_id: 'exam', score: 50, component: { id: 'exam', name: 'Exam', code: 'exam', maximum_score: 70, sequence_number: 2, is_active: true, created_at: '' } },
+      { id: 'sc-1', result_id: 'c0000000-0000-0000-0000-000000000001', assessment_component_id: '44444444-4444-4444-4444-444444444441', score: 26.5, component: { id: '44444444-4444-4444-4444-444444444441', name: 'CA', code: 'ca', maximum_score: 30, sequence_number: 1, is_active: true, created_at: '' } },
+      { id: 'sc-2', result_id: 'c0000000-0000-0000-0000-000000000001', assessment_component_id: '44444444-4444-4444-4444-444444444442', score: 60, component: { id: '44444444-4444-4444-4444-444444444442', name: 'Exam', code: 'exam', maximum_score: 70, sequence_number: 2, is_active: true, created_at: '' } },
     ],
   },
 ];
@@ -145,17 +124,8 @@ let mockAuditLogs: AuditLog[] = [
     id: 'aud-1',
     action: 'PUBLISH_RESULTS',
     entity_type: 'results',
-    entity_id: 'res-1',
+    entity_id: 'c0000000-0000-0000-0000-000000000001',
     change_summary: { subject: 'Mathematics', term: 'First Term', status: 'published' },
-    created_at: new Date().toISOString(),
-    actor_email: 'principal@greenfieldcollege.edu',
-  },
-  {
-    id: 'aud-2',
-    action: 'IMPORT_STUDENTS',
-    entity_type: 'import_jobs',
-    entity_id: 'job-1',
-    change_summary: { file_name: 'jss2_students_2026.xlsx', total_rows: 25, successful: 25 },
     created_at: new Date().toISOString(),
     actor_email: 'admin@greenfieldcollege.edu',
   },
@@ -171,18 +141,6 @@ let mockImportJobs: ImportJob[] = [
     successful_rows: 25,
     failed_rows: 0,
     created_rows: 25,
-    updated_rows: 0,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'job-2',
-    import_type: 'results_subject',
-    status: 'completed',
-    file_name: 'mathematics_first_term_jss2a.xlsx',
-    total_rows: 26,
-    successful_rows: 26,
-    failed_rows: 0,
-    created_rows: 26,
     updated_rows: 0,
     created_at: new Date().toISOString(),
   },
@@ -232,6 +190,35 @@ export async function getAdminOverviewStats() {
 }
 
 export async function getAdminStudents(query?: string, classId?: string, status?: string) {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      let q = supabase
+        .from('students')
+        .select('*, class:classes(id, name, level)')
+        .order('student_id');
+
+      if (classId) q = q.eq('class_id', classId);
+      if (status) q = q.eq('status', status);
+
+      const { data, error } = await q;
+      if (!error && data && data.length > 0) {
+        let list = data as unknown as StudentRecord[];
+        if (query) {
+          const qLower = query.toLowerCase();
+          list = list.filter(s =>
+            s.student_id.toLowerCase().includes(qLower) ||
+            s.first_name.toLowerCase().includes(qLower) ||
+            s.last_name.toLowerCase().includes(qLower)
+          );
+        }
+        return list;
+      }
+    } catch {
+      // fallback
+    }
+  }
+
   let list = [...mockStudents];
   if (query) {
     const q = query.toLowerCase();
@@ -258,6 +245,37 @@ export async function addAdminStudent(data: {
   class_id?: string;
   admission_date?: string;
 }) {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data: inserted, error } = await supabase
+        .from('students')
+        .insert({
+          student_id: data.student_id.toUpperCase(),
+          first_name: data.first_name,
+          last_name: data.last_name,
+          other_names: data.other_names || null,
+          class_id: data.class_id || null,
+          admission_date: data.admission_date || null,
+          status: 'active',
+        })
+        .select('*, class:classes(id, name, level)')
+        .single();
+
+      if (!error && inserted) {
+        const studentRecord = inserted as unknown as StudentRecord;
+        mockStudents.unshift(studentRecord);
+        recordAuditLog('CREATE_STUDENT', 'students', studentRecord.id, {
+          student_id: studentRecord.student_id,
+          name: `${studentRecord.first_name} ${studentRecord.last_name}`,
+        });
+        return studentRecord;
+      }
+    } catch {
+      // fallback to mock
+    }
+  }
+
   const existing = mockStudents.find(s => s.student_id === data.student_id.toUpperCase());
   if (existing) {
     throw new Error(`Student ID ${data.student_id} already exists`);
@@ -280,8 +298,6 @@ export async function addAdminStudent(data: {
   };
 
   mockStudents.unshift(newStudent);
-
-  // Record audit log
   recordAuditLog('CREATE_STUDENT', 'students', newStudent.id, {
     student_id: newStudent.student_id,
     name: `${newStudent.first_name} ${newStudent.last_name}`,
@@ -291,11 +307,46 @@ export async function addAdminStudent(data: {
   return newStudent;
 }
 
-export async function getAdminClasses() {
+export async function getAdminClasses(): Promise<ClassRecord[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from('classes')
+        .select('*')
+        .order('name');
+
+      if (!error && data && data.length > 0) {
+        return data as ClassRecord[];
+      }
+    } catch {
+      // fallback
+    }
+  }
   return [...mockClasses];
 }
 
-export async function addAdminClass(data: { name: string; level: string }) {
+export async function addAdminClass(data: { name: string; level: string }): Promise<ClassRecord> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data: inserted, error } = await supabase
+        .from('classes')
+        .insert({ name: data.name, level: data.level, status: 'active' })
+        .select()
+        .single();
+
+      if (!error && inserted) {
+        const classObj = inserted as ClassRecord;
+        mockClasses.push(classObj);
+        recordAuditLog('CREATE_CLASS', 'classes', classObj.id, { name: classObj.name, level: classObj.level });
+        return classObj;
+      }
+    } catch {
+      // fallback
+    }
+  }
+
   const existing = mockClasses.find(c => c.name.toLowerCase() === data.name.toLowerCase());
   if (existing) {
     throw new Error(`Class name "${data.name}" already exists`);
@@ -315,11 +366,46 @@ export async function addAdminClass(data: { name: string; level: string }) {
   return newClass;
 }
 
-export async function getAdminSubjects() {
+export async function getAdminSubjects(): Promise<SubjectRecord[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from('subjects')
+        .select('*')
+        .order('name');
+
+      if (!error && data && data.length > 0) {
+        return data as SubjectRecord[];
+      }
+    } catch {
+      // fallback
+    }
+  }
   return [...mockSubjects];
 }
 
-export async function addAdminSubject(data: { name: string; code: string }) {
+export async function addAdminSubject(data: { name: string; code: string }): Promise<SubjectRecord> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data: inserted, error } = await supabase
+        .from('subjects')
+        .insert({ name: data.name, code: data.code.toUpperCase(), status: 'active' })
+        .select()
+        .single();
+
+      if (!error && inserted) {
+        const sub = inserted as SubjectRecord;
+        mockSubjects.push(sub);
+        recordAuditLog('CREATE_SUBJECT', 'subjects', sub.id, { name: sub.name, code: sub.code });
+        return sub;
+      }
+    } catch {
+      // fallback
+    }
+  }
+
   const existing = mockSubjects.find(s => s.code.toLowerCase() === data.code.toLowerCase());
   if (existing) {
     throw new Error(`Subject code "${data.code}" already exists`);
@@ -338,15 +424,94 @@ export async function addAdminSubject(data: { name: string; code: string }) {
   return newSubject;
 }
 
-export async function getAdminSessions() {
+export async function getAdminSessions(): Promise<AcademicSession[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from('academic_sessions')
+        .select('*')
+        .order('start_date', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        return data as AcademicSession[];
+      }
+    } catch {
+      // fallback
+    }
+  }
   return [...mockSessions];
 }
 
-export async function getAdminTerms() {
+export async function getAdminTerms(): Promise<TermRecord[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from('terms')
+        .select('*')
+        .order('sequence_number');
+
+      if (!error && data && data.length > 0) {
+        return data as TermRecord[];
+      }
+    } catch {
+      // fallback
+    }
+  }
   return [...mockTerms];
 }
 
+export async function setActiveAdminTerm(termId: string) {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      // Deactivate other terms and activate target
+      await supabase.from('terms').update({ is_active: false }).neq('id', termId);
+      await supabase.from('terms').update({ is_active: true }).eq('id', termId);
+      await supabase.from('school_settings').update({ current_term_id: termId }).neq('id', '00000000-0000-0000-0000-000000000000');
+      recordAuditLog('SET_ACTIVE_TERM', 'terms', termId, { active_term_id: termId });
+      return { success: true };
+    } catch (err) {
+      console.error('Failed to set active term in Supabase:', err);
+    }
+  }
+
+  mockTerms.forEach(t => {
+    t.is_active = (t.id === termId);
+  });
+  return { success: true };
+}
+
 export async function getAdminResults(filters?: { termId?: string; classId?: string; subjectId?: string; status?: string }) {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      let q = supabase
+        .from('results')
+        .select(`
+          id, student_id, subject_id, class_id, term_id, status, total_score, grade, remarks, published_at, created_at, updated_at,
+          student:students(id, student_id, first_name, last_name),
+          subject:subjects(id, name, code),
+          class:classes(id, name, level),
+          scores:result_scores(id, score, assessment_component_id, component:assessment_components(id, name, code, maximum_score))
+        `)
+        .order('created_at', { ascending: false });
+
+      if (filters?.termId) q = q.eq('term_id', filters.termId);
+      if (filters?.classId) q = q.eq('class_id', filters.classId);
+      if (filters?.subjectId) q = q.eq('subject_id', filters.subjectId);
+      if (filters?.status) q = q.eq('status', filters.status);
+
+      const { data, error } = await q;
+      if (!error && data && data.length > 0) {
+        return data as unknown as ResultRecord[];
+      }
+    } catch {
+      // fallback
+    }
+  }
+
   let list = [...mockResults];
   if (filters?.termId) list = list.filter(r => r.term_id === filters.termId);
   if (filters?.classId) list = list.filter(r => r.class_id === filters.classId);
@@ -356,30 +521,132 @@ export async function getAdminResults(filters?: { termId?: string; classId?: str
 }
 
 export async function saveSingleResult(data: {
-  student_id: string; // student DB id or Admission number
+  student_id: string; // student DB id or Admission number (e.g. GFS001)
   subject_id: string;
   class_id: string;
   term_id: string;
   ca_score: number;
   exam_score: number;
   status: 'draft' | 'pending_review' | 'published';
-}) {
-  const student = mockStudents.find(s => s.id === data.student_id || s.student_id === data.student_id);
-  if (!student) throw new Error('Student not found');
-
-  const subject = mockSubjects.find(s => s.id === data.subject_id);
-  const classItem = mockClasses.find(c => c.id === data.class_id);
+}): Promise<ResultRecord> {
   const total = Number(data.ca_score) + Number(data.exam_score);
   const evalResult = evaluateGrade(total);
 
-  // Check existing result
+  let studentDbId = data.student_id;
+  let studentObj: StudentRecord | undefined;
+
+  // Supabase Database Persistence
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+
+      // 1. Resolve student UUID from database
+      const { data: foundStudent } = await supabase
+        .from('students')
+        .select('*, class:classes(id, name, level)')
+        .or(`id.eq.${data.student_id},student_id.eq.${data.student_id.toUpperCase()}`)
+        .limit(1)
+        .single();
+
+      if (foundStudent) {
+        studentDbId = foundStudent.id;
+        studentObj = foundStudent as unknown as StudentRecord;
+      }
+
+      // 2. Fetch component IDs
+      const { data: components } = await supabase
+        .from('assessment_components')
+        .select('id, code');
+
+      const caComp = components?.find(c => c.code === 'ca') || { id: '44444444-4444-4444-4444-444444444441' };
+      const examComp = components?.find(c => c.code === 'exam') || { id: '44444444-4444-4444-4444-444444444442' };
+
+      // 3. Upsert into results
+      const { data: savedResult, error: upsertErr } = await supabase
+        .from('results')
+        .upsert({
+          student_id: studentDbId,
+          subject_id: data.subject_id,
+          class_id: data.class_id,
+          term_id: data.term_id,
+          total_score: total,
+          grade: evalResult.grade,
+          remarks: evalResult.remark,
+          status: data.status,
+          published_at: data.status === 'published' ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'student_id,subject_id,term_id' })
+        .select(`
+          id, student_id, subject_id, class_id, term_id, status, total_score, grade, remarks, published_at, created_at, updated_at,
+          subject:subjects(id, name, code),
+          class:classes(id, name, level)
+        `)
+        .single();
+
+      if (upsertErr) {
+        console.error('Supabase results upsert error:', upsertErr);
+      }
+
+      if (savedResult) {
+        // 4. Upsert component scores
+        await supabase.from('result_scores').upsert([
+          {
+            result_id: savedResult.id,
+            assessment_component_id: caComp.id,
+            score: Number(data.ca_score),
+          },
+          {
+            result_id: savedResult.id,
+            assessment_component_id: examComp.id,
+            score: Number(data.exam_score),
+          },
+        ], { onConflict: 'result_id,assessment_component_id' });
+
+        recordAuditLog('SAVE_RESULT', 'results', savedResult.id, {
+          student_id: studentObj?.student_id || data.student_id,
+          term_id: data.term_id,
+          total_score: total,
+          status: data.status,
+        });
+
+        const createdRes: ResultRecord = {
+          ...savedResult,
+          student: studentObj,
+          scores: [
+            { id: `sc-${savedResult.id}-1`, result_id: savedResult.id, assessment_component_id: caComp.id, score: data.ca_score },
+            { id: `sc-${savedResult.id}-2`, result_id: savedResult.id, assessment_component_id: examComp.id, score: data.exam_score },
+          ],
+        } as unknown as ResultRecord;
+
+        // Keep local cache synced
+        const existingIdx = mockResults.findIndex(r => r.id === savedResult.id || (r.student_id === studentDbId && r.subject_id === data.subject_id && r.term_id === data.term_id));
+        if (existingIdx >= 0) {
+          mockResults[existingIdx] = createdRes;
+        } else {
+          mockResults.unshift(createdRes);
+        }
+
+        return createdRes;
+      }
+    } catch (err) {
+      console.error('Error saving result to Supabase:', err);
+    }
+  }
+
+  // In-memory fallback
+  const student = mockStudents.find(s => s.id === data.student_id || s.student_id === data.student_id);
+  const subject = mockSubjects.find(s => s.id === data.subject_id);
+  const classItem = mockClasses.find(c => c.id === data.class_id);
+
   const existingIndex = mockResults.findIndex(r =>
-    r.student_id === student.id && r.subject_id === data.subject_id && r.term_id === data.term_id
+    (r.student_id === data.student_id || r.student_id === student?.id) &&
+    r.subject_id === data.subject_id &&
+    r.term_id === data.term_id
   );
 
   const resultRecord: ResultRecord = {
     id: existingIndex >= 0 ? mockResults[existingIndex].id : `res-${Date.now()}`,
-    student_id: student.id,
+    student_id: student?.id || data.student_id,
     subject_id: data.subject_id,
     class_id: data.class_id,
     term_id: data.term_id,
@@ -387,41 +654,70 @@ export async function saveSingleResult(data: {
     total_score: total,
     grade: evalResult.grade,
     remarks: evalResult.remark,
-    student,
+    student: student || mockStudents[0],
     subject,
     class: classItem,
     scores: [
-      { id: `sc-${Date.now()}-1`, result_id: '', assessment_component_id: 'ca', score: data.ca_score, component: { id: 'ca', name: 'CA', code: 'ca', maximum_score: 30, sequence_number: 1, is_active: true, created_at: '' } },
-      { id: `sc-${Date.now()}-2`, result_id: '', assessment_component_id: 'exam', score: data.exam_score, component: { id: 'exam', name: 'Exam', code: 'exam', maximum_score: 70, sequence_number: 2, is_active: true, created_at: '' } },
+      { id: `sc-${Date.now()}-1`, result_id: '', assessment_component_id: '44444444-4444-4444-4444-444444444441', score: data.ca_score, component: { id: '44444444-4444-4444-4444-444444444441', name: 'CA', code: 'ca', maximum_score: 30, sequence_number: 1, is_active: true, created_at: '' } },
+      { id: `sc-${Date.now()}-2`, result_id: '', assessment_component_id: '44444444-4444-4444-4444-444444444442', score: data.exam_score, component: { id: '44444444-4444-4444-4444-444444444442', name: 'Exam', code: 'exam', maximum_score: 70, sequence_number: 2, is_active: true, created_at: '' } },
     ],
+    published_at: data.status === 'published' ? new Date().toISOString() : null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
   if (existingIndex >= 0) {
     mockResults[existingIndex] = resultRecord;
-    recordAuditLog('UPDATE_RESULT', 'results', resultRecord.id, {
-      student_id: student.student_id,
-      subject: subject?.name,
-      total_score: total,
-      grade: evalResult.grade,
-      status: data.status,
-    });
   } else {
-    mockResults.push(resultRecord);
-    recordAuditLog('CREATE_RESULT', 'results', resultRecord.id, {
-      student_id: student.student_id,
-      subject: subject?.name,
-      total_score: total,
-      grade: evalResult.grade,
-      status: data.status,
-    });
+    mockResults.unshift(resultRecord);
   }
+
+  recordAuditLog(existingIndex >= 0 ? 'UPDATE_RESULT' : 'CREATE_RESULT', 'results', resultRecord.id, {
+    student_id: student?.student_id || data.student_id,
+    subject: subject?.name,
+    total_score: total,
+    grade: evalResult.grade,
+    status: data.status,
+  });
 
   return resultRecord;
 }
 
 export async function publishResultBatch(resultIds: string[], reason: string = 'Authorized publication') {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { error } = await supabase
+        .from('results')
+        .update({
+          status: 'published',
+          published_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', resultIds);
+
+      if (!error) {
+        recordAuditLog('PUBLISH_RESULTS_BATCH', 'results', null, {
+          count: resultIds.length,
+          reason,
+          result_ids: resultIds,
+        });
+
+        // Also update local mock if present
+        mockResults.forEach(r => {
+          if (resultIds.includes(r.id)) {
+            r.status = 'published';
+            r.published_at = new Date().toISOString();
+          }
+        });
+
+        return { count: resultIds.length };
+      }
+    } catch (err) {
+      console.error('Error publishing in Supabase:', err);
+    }
+  }
+
   let count = 0;
   for (const id of resultIds) {
     const res = mockResults.find(r => r.id === id);
@@ -438,25 +734,28 @@ export async function publishResultBatch(resultIds: string[], reason: string = '
     result_ids: resultIds,
   });
 
-  return { success: true, count };
+  return { count };
 }
 
-export function recordAuditLog(action: string, entity_type: string, entity_id: string | null, summary: Record<string, unknown>) {
-  mockAuditLogs.unshift({
+export function recordAuditLog(
+  action: string,
+  entity_type: string,
+  entity_id: string | null,
+  change_summary: Record<string, unknown>
+) {
+  const newLog: AuditLog = {
     id: `aud-${Date.now()}`,
     action,
     entity_type,
-    entity_id,
-    change_summary: summary,
+    entity_id: entity_id || undefined,
+    change_summary,
     created_at: new Date().toISOString(),
     actor_email: 'admin@greenfieldcollege.edu',
-  });
+  };
+  mockAuditLogs.unshift(newLog);
+  return newLog;
 }
 
 export async function getAdminAuditLogs() {
   return [...mockAuditLogs];
-}
-
-export async function getAdminImportJobs() {
-  return [...mockImportJobs];
 }

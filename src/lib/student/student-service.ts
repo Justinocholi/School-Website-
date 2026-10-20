@@ -302,34 +302,35 @@ export async function getStudentPublishedResults(studentDbId: string, termId?: s
   if (isSupabaseConfigured()) {
     try {
       const supabase = await createClient();
-      let query = supabase
-        .from('results')
-        .select(`
-          id, student_id, total_score, grade, remarks, status, published_at, created_at,
-          subject:subjects(id, name, code),
-          class:classes(id, name, level),
-          scores:result_scores(id, score, component:assessment_components(id, name, code, maximum_score))
-        `)
-        .eq('student_id', studentDbId)
-        .eq('status', 'published');
-
-      if (termId) {
-        query = query.eq('term_id', termId);
-      }
-
-      const { data: dbResults } = await query;
       const { data: dbTerms } = await supabase.from('terms').select('*').order('sequence_number');
       const { data: dbSessions } = await supabase.from('academic_sessions').select('*');
 
-      if (dbResults && dbResults.length > 0) {
-        const typedResults = dbResults as unknown as ResultRecord[];
+      if (dbTerms && dbTerms.length > 0) {
+        const termsList = dbTerms as TermRecord[];
+        const activeTerm = termsList.find((t: TermRecord) => t.is_active);
+        const currentTermId = termId || activeTerm?.id || termsList[0].id;
+
+        const { data: dbResults } = await supabase
+          .from('results')
+          .select(`
+            id, student_id, total_score, grade, remarks, status, published_at, created_at,
+            subject:subjects(id, name, code),
+            class:classes(id, name, level),
+            scores:result_scores(id, score, component:assessment_components(id, name, code, maximum_score))
+          `)
+          .eq('student_id', studentDbId)
+          .eq('term_id', currentTermId)
+          .eq('status', 'published');
+
+        const typedResults = (dbResults || []) as unknown as ResultRecord[];
         const performance = calculateTermPerformance(typedResults);
+
         return {
           results: typedResults,
           performance,
-          terms: (dbTerms as unknown as TermRecord[]) || DEMO_TERMS,
+          terms: dbTerms as unknown as TermRecord[],
           sessions: (dbSessions as unknown as AcademicSession[]) || DEMO_SESSIONS,
-          selectedTermId: termId || (dbTerms?.[0]?.id || DEMO_TERMS[0].id),
+          selectedTermId: currentTermId,
         };
       }
     } catch {
