@@ -3,7 +3,9 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Send, ShieldCheck } from 'lucide-react';
 import { getAdminResults } from '@/lib/admin/admin-service';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { ResultPublicationReview } from '@/components/admin/ResultPublicationReview';
+import { AccessRestricted } from '@/components/admin/AccessRestricted';
 
 export const metadata: Metadata = {
   title: 'Review & Publish Results',
@@ -11,6 +13,16 @@ export const metadata: Metadata = {
 };
 
 export default async function ResultReviewPage() {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return (
+      <AccessRestricted
+        title="Publication Authorization Restricted"
+        description="Only School Administrators have the authority to scrutinize marks and authorize their publication to student report cards. Teachers can enter and submit scores for review."
+      />
+    );
+  }
+
   const pendingResults = await getAdminResults({ status: 'pending_review' });
 
   return (

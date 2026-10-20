@@ -71,7 +71,7 @@ export function Navbar() {
             <Link href="/admin">
               <Button variant="outline" size="md" className="gap-1.5 text-xs">
                 <Shield className="w-3.5 h-3.5 text-gray-500" />
-                Staff Admin
+                Staff Portal
               </Button>
             </Link>
           </div>

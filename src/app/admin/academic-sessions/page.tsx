@@ -3,6 +3,8 @@ import { Metadata } from 'next';
 import { Calendar, CheckCircle2, Clock } from 'lucide-react';
 import { getAdminSessions, getAdminTerms } from '@/lib/admin/admin-service';
 import { setActiveTermAction } from '@/app/actions/admin-academics';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
+import { AccessRestricted } from '@/components/admin/AccessRestricted';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,6 +15,16 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminSessionsPage() {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return (
+      <AccessRestricted
+        title="Calendar & Session Management Restricted"
+        description="Configuring calendar sessions and changing the active academic term is reserved for School Administrators."
+      />
+    );
+  }
+
   const sessions = await getAdminSessions();
   const terms = await getAdminTerms();
 

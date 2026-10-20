@@ -6,6 +6,7 @@ import {
   publishResultBatch,
   recordAuditLog,
 } from '@/lib/admin/admin-service';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { revalidatePath } from 'next/cache';
 
 const singleResultSchema = z.object({
@@ -19,6 +20,7 @@ const singleResultSchema = z.object({
 });
 
 export async function saveSingleResultAction(prevState: unknown, formData: FormData) {
+  const staff = await getAuthenticatedStaff();
   const rawData = {
     student_id: formData.get('student_id') as string,
     subject_id: formData.get('subject_id') as string,
@@ -28,6 +30,11 @@ export async function saveSingleResultAction(prevState: unknown, formData: FormD
     exam_score: formData.get('exam_score'),
     status: formData.get('status') as 'draft' | 'pending_review' | 'published',
   };
+
+  // Teachers cannot directly publish; force pending_review
+  if (staff?.role === 'teacher' && rawData.status === 'published') {
+    rawData.status = 'pending_review';
+  }
 
   const parsed = singleResultSchema.safeParse(rawData);
   if (!parsed.success) {
@@ -45,7 +52,7 @@ export async function saveSingleResultAction(prevState: unknown, formData: FormD
     revalidatePath('/student');
     return {
       success: true,
-      message: `Result for student ${parsed.data.student_id} saved successfully (${record.total_score} - Grade ${record.grade}).`,
+      message: `Result for student ${parsed.data.student_id} saved successfully (${record.total_score} - Grade ${record.grade})${staff?.role === 'teacher' ? ' and submitted for Administrator review' : ''}.`,
     };
   } catch (err: unknown) {
     return {
@@ -56,6 +63,14 @@ export async function saveSingleResultAction(prevState: unknown, formData: FormD
 }
 
 export async function publishResultsAction(resultIds: string[], reason: string) {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return {
+      success: false,
+      message: 'Access denied: Only School Administrators can authorize and publish examination results.',
+    };
+  }
+
   if (!resultIds || resultIds.length === 0) {
     return { success: false, message: 'No results selected for publication.' };
   }
@@ -83,6 +98,14 @@ export async function correctPublishedResultAction(
   examScore: number,
   reason: string
 ) {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return {
+      success: false,
+      message: 'Access denied: Modifying published results requires School Administrator privileges.',
+    };
+  }
+
   if (!reason || reason.trim().length < 5) {
     return { success: false, message: 'A verified administrative audit reason is required to correct published marks.' };
   }

@@ -15,6 +15,7 @@ interface ManualResultEntryFormProps {
   classes: ClassRecord[];
   subjects: SubjectRecord[];
   terms: TermRecord[];
+  userRole?: 'administrator' | 'teacher';
 }
 
 export function ManualResultEntryForm({
@@ -22,7 +23,9 @@ export function ManualResultEntryForm({
   classes,
   subjects,
   terms,
+  userRole = 'administrator',
 }: ManualResultEntryFormProps) {
+  const isTeacher = userRole === 'teacher';
   const [state, formAction, isPending] = useActionState(saveSingleResultAction, null);
 
   const [caScore, setCaScore] = useState<number>(25);
@@ -184,11 +187,13 @@ export function ManualResultEntryForm({
             <label className="text-xs font-semibold text-gray-700">Workflow Status:</label>
             <select
               name="status"
-              defaultValue="published"
+              defaultValue={isTeacher ? 'pending_review' : 'published'}
               className="h-9 rounded-md border border-gray-300 bg-white px-2.5 text-xs font-semibold text-emerald-800"
             >
-              <option value="published">Publish Immediately (Visible to Student)</option>
-              <option value="pending_review">Submit for Review (Pending Approval)</option>
+              {!isTeacher && (
+                <option value="published">Publish Immediately (Visible to Student)</option>
+              )}
+              <option value="pending_review">Submit for Review (Pending Admin Approval)</option>
               <option value="draft">Save as Draft (Private)</option>
             </select>
           </div>

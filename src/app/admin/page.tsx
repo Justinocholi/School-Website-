@@ -16,17 +16,23 @@ import {
   Send,
 } from 'lucide-react';
 import { getAdminOverviewStats } from '@/lib/admin/admin-service';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
-  title: 'Admin Dashboard Overview',
+  title: 'Staff Dashboard Overview',
   description: 'Executive management overview of students, classes, subjects, result publication, and imports.',
 };
 
 export default async function AdminOverviewPage() {
-  const stats = await getAdminOverviewStats();
+  const [stats, staff] = await Promise.all([
+    getAdminOverviewStats(),
+    getAuthenticatedStaff(),
+  ]);
+
+  const isAdmin = staff?.role === 'administrator';
 
   return (
     <div className="space-y-8">
@@ -34,10 +40,12 @@ export default async function AdminOverviewPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Administrator Overview
+            {isAdmin ? 'Administrator Overview' : 'Academic Staff Dashboard'}
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Student records, examination results, and academic operations monitoring.
+            {isAdmin
+              ? 'Institutional governance, student records, examination results, and operations monitoring.'
+              : `Welcome, ${staff?.display_name || 'Staff'}. Manage student records, enter continuous assessments, and submit exam marks.`}
           </p>
         </div>
 
@@ -135,15 +143,23 @@ export default async function AdminOverviewPage() {
               <span className="font-bold">Results Awaiting Publication:</span> There are {stats.pendingResults} imported/draft subject results pending academic review and approval.
             </div>
           </div>
-          <Link href="/admin/results/review">
-            <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs whitespace-nowrap">
-              Review & Publish Now
-            </Button>
-          </Link>
+          {isAdmin ? (
+            <Link href="/admin/results/review">
+              <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs whitespace-nowrap">
+                Review & Publish Now
+              </Button>
+            </Link>
+          ) : (
+            <Link href="/admin/results">
+              <Button size="sm" variant="outline" className="text-amber-800 border-amber-300 hover:bg-amber-100 font-semibold text-xs whitespace-nowrap">
+                View All Results
+              </Button>
+            </Link>
+          )}
         </div>
       )}
 
-      {/* Two Column Section: Recent Import Jobs & Recent Audit Activity */}
+      {/* Two Column Section: Recent Import Jobs & Recent Audit Activity (or Teacher Guidelines) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Recent Imports */}
         <Card className="border-gray-200">
@@ -177,37 +193,71 @@ export default async function AdminOverviewPage() {
           </CardContent>
         </Card>
 
-        {/* Audit Log Activity */}
-        <Card className="border-gray-200">
-          <CardHeader className="py-4 px-6 border-b border-gray-100 flex flex-row items-center justify-between">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <History className="w-4 h-4 text-emerald-700" />
-              Administrative Audit Log
-            </CardTitle>
-            <Link href="/admin/audit-logs" className="text-xs text-emerald-700 hover:underline font-medium">
-              View All Logs &rarr;
-            </Link>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-gray-100">
-              {stats.recentActivity.map((log) => (
-                <div key={log.id} className="p-4 space-y-1 hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      {log.action}
-                    </span>
-                    <span className="text-[11px] text-gray-400">
-                      {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+        {/* Audit Log Activity for Admin / Staff Guidelines for Teachers */}
+        {isAdmin ? (
+          <Card className="border-gray-200">
+            <CardHeader className="py-4 px-6 border-b border-gray-100 flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <History className="w-4 h-4 text-emerald-700" />
+                Administrative Audit Log
+              </CardTitle>
+              <Link href="/admin/audit-logs" className="text-xs text-emerald-700 hover:underline font-medium">
+                View All Logs &rarr;
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-gray-100">
+                {stats.recentActivity.map((log) => (
+                  <div key={log.id} className="p-4 space-y-1 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        {log.action}
+                      </span>
+                      <span className="text-[11px] text-gray-400">
+                        {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 truncate">
+                      Actor: {log.actor_email || 'admin'} &bull; Entity: {log.entity_type}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-600 truncate">
-                    Actor: {log.actor_email || 'admin'} &bull; Entity: {log.entity_type}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-gray-200">
+            <CardHeader className="py-4 px-6 border-b border-gray-100 flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <FileCheck2 className="w-4 h-4 text-emerald-700" />
+                Academic Staff Guidelines & Workflow
+              </CardTitle>
+              <Link href="/admin/results/entry" className="text-xs text-emerald-700 hover:underline font-medium">
+                Enter Marks &rarr;
+              </Link>
+            </CardHeader>
+            <CardContent className="p-5 space-y-3 text-xs text-gray-600">
+              <div className="p-3 rounded-lg bg-slate-50 border border-gray-100 space-y-1">
+                <span className="font-bold text-gray-800 block text-xs">Continuous Assessment (CA) — 30 Marks Max</span>
+                <p className="text-[11px] text-gray-500">
+                  Record test, homework, and quiz scores up to 30.0 marks per student per subject.
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 border border-gray-100 space-y-1">
+                <span className="font-bold text-gray-800 block text-xs">Terminal Examination — 70 Marks Max</span>
+                <p className="text-[11px] text-gray-500">
+                  Standardized end-of-term examination score up to 70.0 marks.
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 space-y-1 text-emerald-950">
+                <span className="font-bold block text-xs">Approval Workflow</span>
+                <p className="text-[11px] text-emerald-900">
+                  Scores saved by academic staff are automatically marked as <strong>Pending Review</strong>. School Administrators will review and authorize publication to the student portal.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

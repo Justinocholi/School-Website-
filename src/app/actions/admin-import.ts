@@ -49,6 +49,8 @@ export async function uploadAndValidateResultFile(
   return await validateSubjectResultImport(rawRows, maxCa, maxExam);
 }
 
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
+
 export async function executeResultImportAction(
   validRows: SubjectResultImportRow[],
   params: {
@@ -58,6 +60,11 @@ export async function executeResultImportAction(
     status: 'draft' | 'pending_review' | 'published';
   }
 ) {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role === 'teacher' && params.status === 'published') {
+    params.status = 'pending_review';
+  }
+
   const result = await executeResultImport(validRows, params);
   revalidatePath('/admin/results');
   revalidatePath('/admin/results/review');

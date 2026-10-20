@@ -1,13 +1,23 @@
 'use client';
 
-import React, { useActionState, useEffect } from 'react';
+import React, { useState, useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Shield, Lock, Mail, ArrowRight, HelpCircle, CheckCircle2, GraduationCap } from 'lucide-react';
+import {
+  Shield,
+  Lock,
+  Mail,
+  ArrowRight,
+  HelpCircle,
+  GraduationCap,
+  UserCheck,
+  Award,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { loginAdmin, AdminAuthResult } from '@/app/actions/admin-auth';
 
 const initialState: AdminAuthResult = {
@@ -19,15 +29,23 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(loginAdmin, initialState);
 
+  const [email, setEmail] = useState('admin@greenfieldcollege.edu');
+  const [password, setPassword] = useState('Admin@2026');
+
   useEffect(() => {
     if (state.success && state.redirectUrl) {
       router.push(state.redirectUrl);
     }
   }, [state, router]);
 
+  const setCredentials = (e: string, p: string) => {
+    setEmail(e);
+    setPassword(p);
+  };
+
   return (
-    <div className="py-12 lg:py-20 flex items-center justify-center px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-6">
+    <div className="py-12 lg:py-16 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-lg space-y-6">
         {/* Card Header */}
         <div className="text-center space-y-2">
           <div className="inline-flex w-14 h-14 rounded-2xl bg-slate-900 text-amber-400 items-center justify-center font-bold shadow-lg border border-slate-800">
@@ -41,17 +59,87 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Demo Credentials Helper Pill */}
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-xs text-emerald-950 flex items-start gap-2.5 shadow-sm">
-          <HelpCircle className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-          <div>
-            <span className="font-bold">Administrator Credentials:</span>
-            <p className="mt-0.5 text-emerald-900">
-              Email: <code className="font-mono font-bold bg-emerald-100 px-1 rounded">admin@greenfieldcollege.edu</code>
-            </p>
-            <p className="mt-0.5 text-emerald-900">
-              Password: <code className="font-mono font-bold bg-emerald-100 px-1 rounded">Admin@2026</code>
-            </p>
+        {/* Multi-Account Role Credentials Helper */}
+        <div className="bg-slate-900 text-white border border-slate-800 rounded-2xl p-4 shadow-md space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+              <UserCheck className="w-4 h-4" /> Available Staff Accounts
+            </span>
+            <span className="text-[11px] text-slate-400">Click to autofill</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            {/* Administrator Account */}
+            <button
+              type="button"
+              onClick={() => setCredentials('admin@greenfieldcollege.edu', 'Admin@2026')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                email.includes('admin')
+                  ? 'border-emerald-500 bg-emerald-950/60 ring-1 ring-emerald-500'
+                  : 'border-slate-800 bg-slate-800/60 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white text-xs">Administrator</span>
+                <Badge variant="success" className="text-[9px] px-1.5 py-0">Full Access</Badge>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 truncate">admin@greenfieldcollege.edu</p>
+              <p className="text-[10px] text-emerald-400 font-mono mt-0.5">Password: Admin@2026</p>
+            </button>
+
+            {/* Teacher 1 Account */}
+            <button
+              type="button"
+              onClick={() => setCredentials('david.adeleke@greenfieldcollege.edu', 'Teacher@2026')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                email.includes('david')
+                  ? 'border-emerald-500 bg-emerald-950/60 ring-1 ring-emerald-500'
+                  : 'border-slate-800 bg-slate-800/60 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white text-xs">Mr. David Adeleke</span>
+                <Badge variant="info" className="text-[9px] px-1.5 py-0">Maths Staff</Badge>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 truncate">david.adeleke@greenfieldcollege.edu</p>
+              <p className="text-[10px] text-emerald-400 font-mono mt-0.5">Password: Teacher@2026</p>
+            </button>
+
+            {/* Teacher 2 Account */}
+            <button
+              type="button"
+              onClick={() => setCredentials('grace.danjuma@greenfieldcollege.edu', 'Teacher@2026')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                email.includes('grace')
+                  ? 'border-emerald-500 bg-emerald-950/60 ring-1 ring-emerald-500'
+                  : 'border-slate-800 bg-slate-800/60 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white text-xs">Mrs. Grace Danjuma</span>
+                <Badge variant="info" className="text-[9px] px-1.5 py-0">English Staff</Badge>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 truncate">grace.danjuma@greenfieldcollege.edu</p>
+              <p className="text-[10px] text-emerald-400 font-mono mt-0.5">Password: Teacher@2026</p>
+            </button>
+
+            {/* Teacher 3 Account */}
+            <button
+              type="button"
+              onClick={() => setCredentials('samuel.osei@greenfieldcollege.edu', 'Teacher@2026')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                email.includes('samuel')
+                  ? 'border-emerald-500 bg-emerald-950/60 ring-1 ring-emerald-500'
+                  : 'border-slate-800 bg-slate-800/60 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white text-xs">Mr. Samuel Osei</span>
+                <Badge variant="info" className="text-[9px] px-1.5 py-0">Sciences Staff</Badge>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 truncate">samuel.osei@greenfieldcollege.edu</p>
+              <p className="text-[10px] text-emerald-400 font-mono mt-0.5">Password: Teacher@2026</p>
+            </button>
           </div>
         </div>
 
@@ -75,10 +163,11 @@ export default function AdminLoginPage() {
                   <Input
                     name="email"
                     type="text"
-                    placeholder="admin@greenfieldcollege.edu"
+                    placeholder="e.g. admin or david.adeleke@greenfieldcollege.edu"
                     required
                     className="font-medium"
-                    defaultValue="admin@greenfieldcollege.edu"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
                 {state.errors?.email && (
@@ -95,7 +184,8 @@ export default function AdminLoginPage() {
                   type="password"
                   required
                   placeholder="••••••••••••"
-                  defaultValue="Admin@2026"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
                 {state.errors?.password && (
                   <p className="text-xs text-rose-600">{state.errors.password[0]}</p>
@@ -111,7 +201,7 @@ export default function AdminLoginPage() {
                   <span>Verifying Credentials...</span>
                 ) : (
                   <>
-                    <span>Enter Staff Portal</span>
+                    <span>Enter Staff Dashboard</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

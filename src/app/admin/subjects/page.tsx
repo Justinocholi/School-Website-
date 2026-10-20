@@ -2,6 +2,7 @@ import React from 'react';
 import { Metadata } from 'next';
 import { BookOpen, PlusCircle } from 'lucide-react';
 import { getAdminSubjects } from '@/lib/admin/admin-service';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CreateSubjectForm } from '@/components/admin/CreateSubjectForm';
@@ -12,7 +13,12 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminSubjectsPage() {
-  const subjects = await getAdminSubjects();
+  const [subjects, staff] = await Promise.all([
+    getAdminSubjects(),
+    getAuthenticatedStaff(),
+  ]);
+
+  const isAdmin = staff?.role === 'administrator';
 
   return (
     <div className="space-y-8">
@@ -22,13 +28,15 @@ export default async function AdminSubjectsPage() {
           Academic Curriculum Subjects
         </h1>
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
-          Define subject codes and manage accredited courses taught at Greenfield College.
+          {isAdmin
+            ? 'Define subject codes and manage accredited courses taught at Greenfield College.'
+            : 'View curriculum subjects, course descriptions, and official subject codes.'}
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Subjects Table */}
-        <div className="lg:col-span-8">
+        <div className={isAdmin ? 'lg:col-span-8' : 'lg:col-span-12'}>
           <Card className="border-gray-200 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs sm:text-sm border-collapse">
@@ -61,20 +69,22 @@ export default async function AdminSubjectsPage() {
           </Card>
         </div>
 
-        {/* Add Subject Form Card */}
-        <div className="lg:col-span-4">
-          <Card className="border-gray-200 shadow-sm">
-            <CardHeader className="py-4 border-b border-gray-100 bg-slate-50">
-              <CardTitle className="text-sm font-bold flex items-center gap-1.5">
-                <PlusCircle className="w-4 h-4 text-emerald-800" />
-                Add New Subject
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-5">
-              <CreateSubjectForm />
-            </CardContent>
-          </Card>
-        </div>
+        {/* Add Subject Form Card (Admin Only) */}
+        {isAdmin && (
+          <div className="lg:col-span-4">
+            <Card className="border-gray-200 shadow-sm">
+              <CardHeader className="py-4 border-b border-gray-100 bg-slate-50">
+                <CardTitle className="text-sm font-bold flex items-center gap-1.5">
+                  <PlusCircle className="w-4 h-4 text-emerald-800" />
+                  Add New Subject
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-5">
+                <CreateSubjectForm />
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

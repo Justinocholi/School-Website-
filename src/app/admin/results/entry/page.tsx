@@ -8,6 +8,7 @@ import {
   getAdminSubjects,
   getAdminTerms,
 } from '@/lib/admin/admin-service';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ManualResultEntryForm } from '@/components/admin/ManualResultEntryForm';
 
@@ -17,10 +18,13 @@ export const metadata: Metadata = {
 };
 
 export default async function ManualResultEntryPage() {
-  const students = await getAdminStudents();
-  const classes = await getAdminClasses();
-  const subjects = await getAdminSubjects();
-  const terms = await getAdminTerms();
+  const [students, classes, subjects, terms, staff] = await Promise.all([
+    getAdminStudents(),
+    getAdminClasses(),
+    getAdminSubjects(),
+    getAdminTerms(),
+    getAuthenticatedStaff(),
+  ]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -47,6 +51,7 @@ export default async function ManualResultEntryPage() {
             classes={classes}
             subjects={subjects}
             terms={terms}
+            userRole={staff?.role || 'administrator'}
           />
         </CardContent>
       </Card>

@@ -28,11 +28,13 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const admin = await getAuthenticatedAdmin();
+  const staff = await getAuthenticatedAdmin();
 
-  if (!admin) {
+  if (!staff) {
     redirect('/admin-login');
   }
+
+  const isAdmin = staff.role === 'administrator';
 
   const navSections = [
     {
@@ -43,7 +45,9 @@ export default async function AdminLayout({
         { name: 'Import Students', href: '/admin/students/import', icon: FileSpreadsheet },
         { name: 'Classes', href: '/admin/classes', icon: Layers },
         { name: 'Subjects', href: '/admin/subjects', icon: BookOpen },
-        { name: 'Sessions & Terms', href: '/admin/academic-sessions', icon: Calendar },
+        ...(isAdmin
+          ? [{ name: 'Sessions & Terms', href: '/admin/academic-sessions', icon: Calendar }]
+          : []),
       ],
     },
     {
@@ -52,32 +56,50 @@ export default async function AdminLayout({
         { name: 'All Results', href: '/admin/results', icon: FileCheck2 },
         { name: 'Manual Entry', href: '/admin/results/entry', icon: PenTool },
         { name: 'Import Results', href: '/admin/results/import', icon: FileSpreadsheet },
-        { name: 'Review & Publish', href: '/admin/results/review', icon: Send },
+        ...(isAdmin
+          ? [{ name: 'Review & Publish', href: '/admin/results/review', icon: Send }]
+          : []),
       ],
     },
-    {
-      title: 'System & Governance',
-      items: [
-        { name: 'Audit Logs', href: '/admin/audit-logs', icon: History },
-        { name: 'Settings & Grading', href: '/admin/settings', icon: Settings },
-      ],
-    },
+    ...(isAdmin
+      ? [
+          {
+            title: 'System & Governance',
+            items: [
+              { name: 'Audit Logs', href: '/admin/audit-logs', icon: History },
+              { name: 'Settings & Grading', href: '/admin/settings', icon: Settings },
+            ],
+          },
+        ]
+      : []),
   ];
+
+  // Derive initials
+  const initials = staff.display_name
+    ? staff.display_name
+        .replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.)\s*/i, '')
+        .split(' ')
+        .map((n) => n[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
+    : isAdmin ? 'AD' : 'TC';
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row selection:bg-emerald-200">
       {/* Sidebar */}
       <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 border-r border-slate-800">
         <div className="p-5 border-b border-slate-800 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-700 text-amber-400 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-emerald-700 text-amber-400 flex items-center justify-center font-bold shadow-sm">
             <Shield className="w-5 h-5" />
           </div>
           <div>
             <span className="font-bold text-white text-base leading-none block">
-              Staff Portal
+              Staff Dashboard
             </span>
             <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
-              School Administrator
+              {isAdmin ? 'School Administrator' : 'Academic Staff'}
             </span>
           </div>
         </div>
@@ -131,20 +153,23 @@ export default async function AdminLayout({
         <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 sticky top-0 z-20 shadow-xs">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-gray-500">Academic Session:</span>
-            <Badge variant="success">2026/2027 (First Term Active)</Badge>
+            <Badge variant="success">2026/2027 (Active Term)</Badge>
+            <Badge variant={isAdmin ? 'default' : 'info'} className="text-[11px] hidden sm:inline-flex">
+              {isAdmin ? 'Full Admin Access' : 'Teacher Access'}
+            </Badge>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
               <span className="text-xs font-bold text-gray-900 block leading-tight">
-                {admin.display_name}
+                {staff.display_name}
               </span>
               <span className="text-[11px] text-gray-500 font-mono">
-                {admin.email}
+                {staff.email}
               </span>
             </div>
             <div className="w-8 h-8 rounded-full bg-emerald-800 text-white flex items-center justify-center font-bold text-xs">
-              AD
+              {initials}
             </div>
             <form action={logoutAdmin}>
               <Button

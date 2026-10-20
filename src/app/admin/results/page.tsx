@@ -14,6 +14,7 @@ import {
   getAdminSubjects,
   getAdminTerms,
 } from '@/lib/admin/admin-service';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,10 +31,15 @@ export default async function AdminResultsPage({
 }) {
   const { termId, classId, subjectId, status } = await searchParams;
 
-  const results = await getAdminResults({ termId, classId, subjectId, status });
-  const classes = await getAdminClasses();
-  const subjects = await getAdminSubjects();
-  const terms = await getAdminTerms();
+  const [results, classes, subjects, terms, staff] = await Promise.all([
+    getAdminResults({ termId, classId, subjectId, status }),
+    getAdminClasses(),
+    getAdminSubjects(),
+    getAdminTerms(),
+    getAuthenticatedStaff(),
+  ]);
+
+  const isAdmin = staff?.role === 'administrator';
 
   return (
     <div className="space-y-6">
@@ -62,12 +68,14 @@ export default async function AdminResultsPage({
               Manual Entry
             </Button>
           </Link>
-          <Link href="/admin/results/review">
-            <Button size="sm" className="text-xs gap-1.5 bg-emerald-800 hover:bg-emerald-900 text-white font-semibold">
-              <Send className="w-3.5 h-3.5 text-amber-400" />
-              Review & Publish
-            </Button>
-          </Link>
+          {isAdmin && (
+            <Link href="/admin/results/review">
+              <Button size="sm" className="text-xs gap-1.5 bg-emerald-800 hover:bg-emerald-900 text-white font-semibold">
+                <Send className="w-3.5 h-3.5 text-amber-400" />
+                Review & Publish
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 

@@ -30,12 +30,14 @@ interface BulkResultImportClientProps {
   classes: ClassRecord[];
   subjects: SubjectRecord[];
   terms: TermRecord[];
+  userRole?: 'administrator' | 'teacher';
 }
 
 export function BulkResultImportClient({
   classes,
   subjects,
   terms,
+  userRole = 'administrator',
 }: BulkResultImportClientProps) {
   const [selectedClass, setSelectedClass] = useState<string>(classes[0]?.id || '');
   const [selectedSubject, setSelectedSubject] = useState<string>(subjects[0]?.id || '');
@@ -324,11 +326,19 @@ export function BulkResultImportClient({
               {resultSummary.created} subject result records saved and queued for publication approval.
             </p>
             <div className="pt-3 flex justify-center gap-3">
-              <Link href="/admin/results/review">
-                <Button size="sm" className="bg-emerald-800 hover:bg-emerald-900 text-white text-xs">
-                  Review & Publish Results
-                </Button>
-              </Link>
+              {userRole === 'administrator' ? (
+                <Link href="/admin/results/review">
+                  <Button size="sm" className="bg-emerald-800 hover:bg-emerald-900 text-white text-xs">
+                    Review & Publish Results
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/admin/results">
+                  <Button size="sm" className="bg-emerald-800 hover:bg-emerald-900 text-white text-xs">
+                    View All Results
+                  </Button>
+                </Link>
+              )}
               <Button size="sm" variant="outline" onClick={handleReset} className="text-xs">
                 Import Another Subject
               </Button>

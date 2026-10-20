@@ -2,6 +2,8 @@ import React from 'react';
 import { Metadata } from 'next';
 import { History, Shield, Filter, Clock } from 'lucide-react';
 import { getAdminAuditLogs } from '@/lib/admin/admin-service';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
+import { AccessRestricted } from '@/components/admin/AccessRestricted';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -11,6 +13,16 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminAuditLogsPage() {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return (
+      <AccessRestricted
+        title="Audit Log Restricted"
+        description="Administrative audit logs are reserved for institutional governance and compliance by School Administrators."
+      />
+    );
+  }
+
   const logs = await getAdminAuditLogs();
 
   return (

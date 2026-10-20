@@ -6,6 +6,7 @@ import {
   addAdminSubject,
   setActiveAdminTerm,
 } from '@/lib/admin/admin-service';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { revalidatePath } from 'next/cache';
 
 const classSchema = z.object({
@@ -19,6 +20,11 @@ const subjectSchema = z.object({
 });
 
 export async function createClassAction(prevState: unknown, formData: FormData) {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return { success: false, message: 'Access denied: Only School Administrators can create new classes.' };
+  }
+
   const name = formData.get('name') as string;
   const level = formData.get('level') as string;
 
@@ -37,6 +43,11 @@ export async function createClassAction(prevState: unknown, formData: FormData) 
 }
 
 export async function createSubjectAction(prevState: unknown, formData: FormData) {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return { success: false, message: 'Access denied: Only School Administrators can create new subjects.' };
+  }
+
   const name = formData.get('name') as string;
   const code = formData.get('code') as string;
 
@@ -55,6 +66,11 @@ export async function createSubjectAction(prevState: unknown, formData: FormData
 }
 
 export async function setActiveTermAction(formData: FormData): Promise<void> {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return;
+  }
+
   const termId = formData.get('termId') as string;
   if (!termId) return;
   try {

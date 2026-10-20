@@ -6,13 +6,25 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DEFAULT_GRADING_RULES } from '@/lib/grading/grading-engine';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
+import { AccessRestricted } from '@/components/admin/AccessRestricted';
 
 export const metadata: Metadata = {
   title: 'School Settings & Grading Configuration',
   description: 'Configure institutional grading rules, assessment maximum marks, and school profile metadata.',
 };
 
-export default function AdminSettingsPage() {
+export default async function AdminSettingsPage() {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return (
+      <AccessRestricted
+        title="Settings & Grading Restricted"
+        description="Institutional grading rules, assessment score weightings, and school configuration are restricted to School Administrators."
+      />
+    );
+  }
+
   return (
     <div className="space-y-8 max-w-5xl">
       <div>

@@ -7,6 +7,7 @@ import {
   getAdminSubjects,
   getAdminTerms,
 } from '@/lib/admin/admin-service';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { BulkResultImportClient } from '@/components/admin/BulkResultImportClient';
 
 export const metadata: Metadata = {
@@ -15,9 +16,12 @@ export const metadata: Metadata = {
 };
 
 export default async function BulkResultImportPage() {
-  const classes = await getAdminClasses();
-  const subjects = await getAdminSubjects();
-  const terms = await getAdminTerms();
+  const [classes, subjects, terms, staff] = await Promise.all([
+    getAdminClasses(),
+    getAdminSubjects(),
+    getAdminTerms(),
+    getAuthenticatedStaff(),
+  ]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -42,6 +46,7 @@ export default async function BulkResultImportPage() {
         classes={classes}
         subjects={subjects}
         terms={terms}
+        userRole={staff?.role || 'administrator'}
       />
     </div>
   );
