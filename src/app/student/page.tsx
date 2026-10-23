@@ -5,7 +5,6 @@ import {
   GraduationCap,
   FileCheck2,
   Bell,
-  ArrowRight,
   Sparkles,
   BookOpen,
   Calendar,
@@ -14,7 +13,8 @@ import {
   Printer,
 } from 'lucide-react';
 import { getAuthenticatedStudent, getStudentDashboardData } from '@/lib/student/student-service';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getAdminTerms } from '@/lib/admin/admin-service';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -27,7 +27,13 @@ export default async function StudentDashboardPage() {
   const student = await getAuthenticatedStudent();
   if (!student) return null;
 
-  const dashboardData = await getStudentDashboardData(student.id);
+  const [dashboardData, terms] = await Promise.all([
+    getStudentDashboardData(student.id),
+    getAdminTerms(),
+  ]);
+
+  const activeTerm = terms.find((t) => t.is_active) || terms[0];
+  const activeTermName = activeTerm ? activeTerm.name : 'First Term';
 
   return (
     <div className="space-y-8">
@@ -39,7 +45,7 @@ export default async function StudentDashboardPage() {
         <div className="relative z-10 max-w-2xl space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-800/80 border border-emerald-600/40 text-xs font-semibold text-amber-300">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>2026/2027 Academic Session &bull; First Term</span>
+            <span>2026/2027 Academic Session &bull; {activeTermName}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Welcome back, {student.first_name}!
@@ -99,7 +105,7 @@ export default async function StudentDashboardPage() {
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Published Results</p>
               <h3 className="text-lg font-bold text-gray-900">{dashboardData.resultsCount} Subjects</h3>
-              <p className="text-xs text-amber-700 font-medium">First Term 2026/2027</p>
+              <p className="text-xs text-amber-700 font-medium">{activeTermName} 2026/2027</p>
             </div>
           </CardContent>
         </Card>
@@ -111,7 +117,7 @@ export default async function StudentDashboardPage() {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Academic Term</p>
-              <h3 className="text-lg font-bold text-gray-900">First Term</h3>
+              <h3 className="text-lg font-bold text-gray-900">{activeTermName}</h3>
               <p className="text-xs text-gray-500">Session 2026/2027</p>
             </div>
           </CardContent>
@@ -120,12 +126,12 @@ export default async function StudentDashboardPage() {
 
       {/* Main Content Grid: Recent Results & Announcements */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Recent Published Results Teaser */}
+        {/* Left Column: Recent Published Results */}
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-900">Published Term Results</h2>
-              <p className="text-xs text-gray-500">First Term, 2026/2027 Academic Session</p>
+              <p className="text-xs text-gray-500">{activeTermName}, 2026/2027 Academic Session</p>
             </div>
             <Link href="/student/results">
               <Button variant="outline" size="sm" className="text-xs font-medium">
@@ -147,31 +153,39 @@ export default async function StudentDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
-                  {dashboardData.recentResults.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 px-4 text-gray-900">
-                        {item.subject?.name || 'Subject'}
-                      </td>
-                      <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-800">
-                        {item.total_score}
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <Badge variant={item.grade === 'A' ? 'success' : item.grade === 'B' ? 'info' : 'warning'}>
-                          {item.grade}
-                        </Badge>
-                      </td>
-                      <td className="py-3.5 px-4 text-center text-xs text-gray-600">
-                        {item.remarks}
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <Link href={`/student/results/${item.id}`}>
-                          <Button variant="ghost" size="sm" className="text-xs text-emerald-700 hover:text-emerald-900">
-                            Breakdown
-                          </Button>
-                        </Link>
+                  {dashboardData.recentResults.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-gray-500 text-xs">
+                        No examination results published for your portal account yet.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    dashboardData.recentResults.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3.5 px-4 text-gray-900">
+                          {item.subject?.name || 'Subject'}
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-800">
+                          {item.total_score}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <Badge variant={item.grade === 'A' ? 'success' : item.grade === 'B' ? 'info' : 'warning'}>
+                            {item.grade}
+                          </Badge>
+                        </td>
+                        <td className="py-3.5 px-4 text-center text-xs text-gray-600">
+                          {item.remarks}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <Link href={`/student/results/${item.id}`}>
+                            <Button variant="ghost" size="sm" className="text-xs text-emerald-700 hover:text-emerald-900">
+                              Breakdown
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

@@ -19,6 +19,7 @@ export interface StaffRecord {
   department?: string;
   assigned_subject?: string;
   assigned_class?: string;
+  password?: string;
   created_at: string;
   status: 'active' | 'inactive';
 }

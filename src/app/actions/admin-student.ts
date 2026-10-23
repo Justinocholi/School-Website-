@@ -43,6 +43,9 @@ export async function createStudentAction(
 
   try {
     await addAdminStudent(parsed.data);
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/admin/students');
+    revalidatePath('/admin');
     return {
       success: true,
       message: `Student ${parsed.data.student_id} successfully created.`,

@@ -77,30 +77,39 @@ export async function loginStudent(
     // Graceful offline/demo fallback when remote Supabase Auth has not yet been seeded:
     // If student ID starts with GFS or is DEMO001 and password matches demo credential
     if ((studentId.startsWith('GFS') || studentId === 'DEMO001') && password === 'Student@2026') {
-      // Look up student details dynamically
-      let studentName = studentId === 'GFS001' ? 'Daniel Okafor' : studentId === 'GFS002' ? 'Sarah Adamu' : `Student (${studentId})`;
-      let className = 'JSS 2A';
+      // Look up student details dynamically from persistent store
+      const { findStoreStudent } = await import('@/lib/storage/store');
+      const matched = findStoreStudent(studentId);
 
-      try {
-        const { getAdminStudents } = await import('@/lib/admin/admin-service');
-        const students = await getAdminStudents(studentId);
-        const matched = students.find(s => s.student_id.toUpperCase() === studentId);
-        if (matched) {
-          studentName = `${matched.first_name} ${matched.last_name}`;
-          className = matched.class?.name || 'JSS 2A';
-        }
-      } catch {
-        // use defaults
-      }
+      const studentSession = matched ? {
+        id: matched.id,
+        student_id: matched.student_id,
+        first_name: matched.first_name,
+        last_name: matched.last_name,
+        name: `${matched.first_name} ${matched.last_name}`,
+        full_name: `${matched.first_name} ${matched.last_name}`,
+        class_name: matched.class?.name || 'JSS 1A',
+        class_id: matched.class_id,
+        admission_date: matched.admission_date || '2026-09-01',
+        status: matched.status || 'active',
+        role: 'student',
+      } : {
+        id: `std-${studentId.toLowerCase()}`,
+        student_id: studentId,
+        first_name: 'Student',
+        last_name: studentId,
+        name: `Student (${studentId})`,
+        full_name: `Student (${studentId})`,
+        class_name: 'JSS 1A',
+        class_id: '77777777-7777-7777-7777-777777777771',
+        admission_date: '2026-09-01',
+        status: 'active',
+        role: 'student',
+      };
 
       // Set demo session cookie
       const cookieStore = await cookies();
-      cookieStore.set('demo_student_session', JSON.stringify({
-        student_id: studentId,
-        role: 'student',
-        name: studentName,
-        class_name: className,
-      }), {
+      cookieStore.set('demo_student_session', JSON.stringify(studentSession), {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         maxAge: 60 * 60 * 24, // 24 hours
@@ -109,7 +118,7 @@ export async function loginStudent(
 
       return {
         success: true,
-        message: 'Credentials accepted. Entering student portal...',
+        message: `Welcome, ${studentSession.first_name}! Entering student portal...`,
         redirectUrl: '/student',
       };
     }
