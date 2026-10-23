@@ -75,15 +75,31 @@ export async function loginStudent(
     }
 
     // Graceful offline/demo fallback when remote Supabase Auth has not yet been seeded:
-    // If student ID is GFS001, GFS002, or DEMO001 and password matches demo credential
-    if ((studentId === 'GFS001' || studentId === 'GFS002' || studentId === 'DEMO001') && password === 'Student@2026') {
+    // If student ID starts with GFS or is DEMO001 and password matches demo credential
+    if ((studentId.startsWith('GFS') || studentId === 'DEMO001') && password === 'Student@2026') {
+      // Look up student details dynamically
+      let studentName = studentId === 'GFS001' ? 'Daniel Okafor' : studentId === 'GFS002' ? 'Sarah Adamu' : `Student (${studentId})`;
+      let className = 'JSS 2A';
+
+      try {
+        const { getAdminStudents } = await import('@/lib/admin/admin-service');
+        const students = await getAdminStudents(studentId);
+        const matched = students.find(s => s.student_id.toUpperCase() === studentId);
+        if (matched) {
+          studentName = `${matched.first_name} ${matched.last_name}`;
+          className = matched.class?.name || 'JSS 2A';
+        }
+      } catch {
+        // use defaults
+      }
+
       // Set demo session cookie
       const cookieStore = await cookies();
       cookieStore.set('demo_student_session', JSON.stringify({
         student_id: studentId,
         role: 'student',
-        name: studentId === 'GFS001' ? 'Daniel Okafor' : 'Sarah Adamu',
-        class_name: 'JSS 2A',
+        name: studentName,
+        class_name: className,
       }), {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

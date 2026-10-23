@@ -11,6 +11,18 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface StaffRecord {
+  id: string;
+  email: string;
+  display_name: string;
+  role: 'administrator' | 'teacher';
+  department?: string;
+  assigned_subject?: string;
+  assigned_class?: string;
+  created_at: string;
+  status: 'active' | 'inactive';
+}
+
 export interface ClassRecord {
   id: string;
   name: string;

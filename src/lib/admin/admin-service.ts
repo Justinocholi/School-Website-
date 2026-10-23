@@ -10,6 +10,7 @@ import {
   AuditLog,
   ImportJob,
   SchoolSettings,
+  StaffRecord,
 } from '@/types/database.types';
 import { evaluateGrade } from '@/lib/grading/grading-engine';
 
@@ -42,6 +43,51 @@ let mockTerms: TermRecord[] = [
   { id: '33333333-3333-3333-3333-333333333331', academic_session_id: '11111111-1111-1111-1111-111111111111', name: 'First Term', sequence_number: 1, is_active: true, created_at: new Date().toISOString() },
   { id: '33333333-3333-3333-3333-333333333332', academic_session_id: '11111111-1111-1111-1111-111111111111', name: 'Second Term', sequence_number: 2, is_active: false, created_at: new Date().toISOString() },
   { id: '33333333-3333-3333-3333-333333333333', academic_session_id: '11111111-1111-1111-1111-111111111111', name: 'Third Term', sequence_number: 3, is_active: false, created_at: new Date().toISOString() },
+];
+
+let mockStaff: StaffRecord[] = [
+  {
+    id: 'a0000000-0000-0000-0000-000000000001',
+    email: 'admin@greenfieldcollege.edu',
+    display_name: 'School Administrator',
+    role: 'administrator',
+    department: 'Executive Governance',
+    created_at: '2026-09-01T08:00:00Z',
+    status: 'active',
+  },
+  {
+    id: 'a0000000-0000-0000-0000-000000000011',
+    email: 'david.adeleke@greenfieldcollege.edu',
+    display_name: 'Mr. David Adeleke',
+    role: 'teacher',
+    department: 'Mathematics & Sciences',
+    assigned_subject: 'Mathematics',
+    assigned_class: 'SS 1 Science',
+    created_at: '2026-09-01T08:00:00Z',
+    status: 'active',
+  },
+  {
+    id: 'a0000000-0000-0000-0000-000000000012',
+    email: 'grace.danjuma@greenfieldcollege.edu',
+    display_name: 'Mrs. Grace Danjuma',
+    role: 'teacher',
+    department: 'Languages & Humanities',
+    assigned_subject: 'English Language',
+    assigned_class: 'JSS 2A',
+    created_at: '2026-09-01T08:00:00Z',
+    status: 'active',
+  },
+  {
+    id: 'a0000000-0000-0000-0000-000000000013',
+    email: 'samuel.osei@greenfieldcollege.edu',
+    display_name: 'Mr. Samuel Osei',
+    role: 'teacher',
+    department: 'Basic Sciences & Computing',
+    assigned_subject: 'Basic Science',
+    assigned_class: 'JSS 1A',
+    created_at: '2026-09-01T08:00:00Z',
+    status: 'active',
+  },
 ];
 
 let mockStudents: StudentRecord[] = [
@@ -202,7 +248,7 @@ export async function getAdminStudents(query?: string, classId?: string, status?
       if (status) q = q.eq('status', status);
 
       const { data, error } = await q;
-      if (!error && data && data.length > 0) {
+      if (!error && data !== null) {
         let list = data as unknown as StudentRecord[];
         if (query) {
           const qLower = query.toLowerCase();
@@ -504,7 +550,7 @@ export async function getAdminResults(filters?: { termId?: string; classId?: str
       if (filters?.status) q = q.eq('status', filters.status);
 
       const { data, error } = await q;
-      if (!error && data && data.length > 0) {
+      if (!error && data !== null) {
         return data as unknown as ResultRecord[];
       }
     } catch {
@@ -540,13 +586,15 @@ export async function saveSingleResult(data: {
     try {
       const supabase = await createClient();
 
-      // 1. Resolve student UUID from database
-      const { data: foundStudent } = await supabase
-        .from('students')
-        .select('*, class:classes(id, name, level)')
-        .or(`id.eq.${data.student_id},student_id.eq.${data.student_id.toUpperCase()}`)
-        .limit(1)
-        .single();
+      // 1. Resolve student UUID from database safely
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.student_id);
+      let studentQuery = supabase.from('students').select('*, class:classes(id, name, level)');
+      if (isUuid) {
+        studentQuery = studentQuery.or(`id.eq.${data.student_id},student_id.eq.${data.student_id.toUpperCase()}`);
+      } else {
+        studentQuery = studentQuery.eq('student_id', data.student_id.toUpperCase());
+      }
+      const { data: foundStudent } = await studentQuery.limit(1).maybeSingle();
 
       if (foundStudent) {
         studentDbId = foundStudent.id;
@@ -758,4 +806,93 @@ export function recordAuditLog(
 
 export async function getAdminAuditLogs() {
   return [...mockAuditLogs];
+}
+
+export async function getAdminStaff(): Promise<StaffRecord[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('role', ['teacher', 'administrator'])
+        .order('created_at', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        return data.map((p) => {
+          const existingMock = mockStaff.find(m => m.id === p.id || m.email?.toLowerCase() === p.email?.toLowerCase());
+          return {
+            id: p.id,
+            email: p.email || (existingMock?.email || ''),
+            display_name: p.display_name,
+            role: p.role as 'administrator' | 'teacher',
+            department: existingMock?.department || (p.role === 'administrator' ? 'Administration' : 'Academic Faculty'),
+            assigned_subject: existingMock?.assigned_subject || 'General Curriculum',
+            assigned_class: existingMock?.assigned_class || 'All Classes',
+            created_at: p.created_at || new Date().toISOString(),
+            status: 'active',
+          };
+        });
+      }
+    } catch {
+      // fallback
+    }
+  }
+
+  return [...mockStaff];
+}
+
+export async function addAdminTeacher(data: {
+  full_name: string;
+  email: string;
+  department: string;
+  assigned_subject?: string;
+  assigned_class?: string;
+}): Promise<StaffRecord> {
+  const normalizedEmail = data.email.toLowerCase().trim();
+  const newId = `t-${Date.now()}`;
+
+  const newStaff: StaffRecord = {
+    id: newId,
+    email: normalizedEmail,
+    display_name: data.full_name.trim(),
+    role: 'teacher',
+    department: data.department.trim(),
+    assigned_subject: data.assigned_subject,
+    assigned_class: data.assigned_class,
+    created_at: new Date().toISOString(),
+    status: 'active',
+  };
+
+  const existingIndex = mockStaff.findIndex(s => s.email.toLowerCase() === normalizedEmail);
+  if (existingIndex >= 0) {
+    mockStaff[existingIndex] = newStaff;
+  } else {
+    mockStaff.push(newStaff);
+  }
+
+  recordAuditLog('REGISTER_TEACHER', 'staff', newStaff.id, {
+    teacher_name: newStaff.display_name,
+    email: newStaff.email,
+    department: newStaff.department,
+    role: 'teacher',
+  });
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      await supabase.from('profiles').upsert({
+        id: newStaff.id,
+        role: 'teacher',
+        display_name: newStaff.display_name,
+        email: newStaff.email,
+        created_at: newStaff.created_at,
+        updated_at: newStaff.created_at,
+      });
+    } catch {
+      // Continue with local
+    }
+  }
+
+  return newStaff;
 }

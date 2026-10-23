@@ -59,6 +59,20 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
+        {/* Teacher Registration Callout */}
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-emerald-950 shadow-xs">
+          <div>
+            <span className="font-bold text-xs block text-emerald-900">New Academic Staff Member?</span>
+            <span className="text-[11px] text-emerald-700">Register your faculty account to access your personal marking dashboard.</span>
+          </div>
+          <Link href="/staff-register" className="shrink-0 w-full sm:w-auto">
+            <Button size="sm" className="w-full bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold gap-1.5 shadow-xs">
+              <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>Register as Teacher &rarr;</span>
+            </Button>
+          </Link>
+        </div>
+
         {/* Multi-Account Role Credentials Helper */}
         <div className="bg-slate-900 text-white border border-slate-800 rounded-2xl p-4 shadow-md space-y-3">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">

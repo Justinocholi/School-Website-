@@ -45,7 +45,7 @@ export default async function AdminOverviewPage() {
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
             {isAdmin
               ? 'Institutional governance, student records, examination results, and operations monitoring.'
-              : `Welcome, ${staff?.display_name || 'Staff'}. Manage student records, enter continuous assessments, and submit exam marks.`}
+              : `Welcome, ${staff?.display_name || 'Academic Staff'}${staff?.department ? ` • ${staff.department}` : ''}. Manage student records, enter continuous assessments, and submit exam marks.`}
           </p>
         </div>
 

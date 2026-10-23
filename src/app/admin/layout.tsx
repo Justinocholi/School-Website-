@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   Layers,
   BookOpen,
+  UserCheck,
   Calendar,
   FileCheck2,
   PenTool,
@@ -41,6 +42,9 @@ export default async function AdminLayout({
       title: 'Management',
       items: [
         { name: 'Overview', href: '/admin', icon: LayoutDashboard },
+        ...(isAdmin
+          ? [{ name: 'Staff & Teachers', href: '/admin/staff', icon: UserCheck }]
+          : []),
         { name: 'Students', href: '/admin/students', icon: Users },
         { name: 'Import Students', href: '/admin/students/import', icon: FileSpreadsheet },
         { name: 'Classes', href: '/admin/classes', icon: Layers },

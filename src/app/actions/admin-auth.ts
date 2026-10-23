@@ -213,6 +213,55 @@ export async function loginAdmin(
       };
     }
 
+    // 3. Check dynamically registered teachers from cookie registry
+    const cookieStore = await cookies();
+    const registeredCookie = cookieStore.get('registered_teachers_registry');
+    let registeredList: Array<{
+      id: string;
+      email: string;
+      display_name: string;
+      role: 'teacher';
+      department?: string;
+      password?: string;
+    }> = [];
+    if (registeredCookie?.value) {
+      try {
+        registeredList = JSON.parse(registeredCookie.value);
+      } catch {
+        // parsing failed
+      }
+    }
+
+    const matchedTeacher = registeredList.find(
+      t => (t.email.toLowerCase() === email || t.display_name.toLowerCase() === email) &&
+           t.password === parsed.data.password
+    );
+
+    if (matchedTeacher) {
+      cookieStore.set(
+        'demo_staff_session',
+        JSON.stringify({
+          id: matchedTeacher.id,
+          email: matchedTeacher.email,
+          display_name: matchedTeacher.display_name,
+          role: 'teacher',
+          department: matchedTeacher.department,
+        }),
+        {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 60 * 60 * 24, // 24 hours
+          path: '/',
+        }
+      );
+
+      return {
+        success: true,
+        message: `Welcome, ${matchedTeacher.display_name}! Entering Staff Dashboard...`,
+        redirectUrl: '/admin',
+      };
+    }
+
     return {
       success: false,
       message: 'Invalid staff credentials. Please check your email and password.',
@@ -224,6 +273,207 @@ export async function loginAdmin(
       message: errorMsg,
     };
   }
+}
+
+const teacherRegisterSchema = z.object({
+  full_name: z.string().min(3, 'Full name must be at least 3 characters long'),
+  email: z.string().email('Please enter a valid official staff email'),
+  department: z.string().min(2, 'Please select or enter your academic department'),
+  assigned_subject: z.string().optional(),
+  assigned_class: z.string().optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters long'),
+  confirm_password: z.string().min(6, 'Please confirm your password'),
+  from_admin: z.string().optional(),
+});
+
+export type TeacherRegisterResult = {
+  success: boolean;
+  message: string;
+  errors?: Record<string, string[]>;
+  redirectUrl?: string;
+};
+
+export async function registerTeacherAction(
+  prevState: TeacherRegisterResult | null,
+  formData: FormData
+): Promise<TeacherRegisterResult> {
+  const raw = {
+    full_name: formData.get('full_name') as string,
+    email: formData.get('email') as string,
+    department: formData.get('department') as string,
+    assigned_subject: (formData.get('assigned_subject') as string) || undefined,
+    assigned_class: (formData.get('assigned_class') as string) || undefined,
+    password: formData.get('password') as string,
+    confirm_password: formData.get('confirm_password') as string,
+    from_admin: (formData.get('from_admin') as string) || undefined,
+  };
+
+  const parsed = teacherRegisterSchema.safeParse({
+    full_name: raw.full_name?.trim(),
+    email: raw.email?.trim().toLowerCase(),
+    department: raw.department?.trim(),
+    assigned_subject: raw.assigned_subject?.trim(),
+    assigned_class: raw.assigned_class?.trim(),
+    password: raw.password,
+    confirm_password: raw.confirm_password,
+    from_admin: raw.from_admin,
+  });
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      message: 'Please resolve the highlighted validation errors.',
+      errors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  if (parsed.data.password !== parsed.data.confirm_password) {
+    return {
+      success: false,
+      message: 'Passwords do not match. Please verify your password confirmation.',
+      errors: {
+        confirm_password: ['Passwords do not match'],
+      },
+    };
+  }
+
+  const { full_name, email, department, assigned_subject, assigned_class, password, from_admin } = parsed.data;
+
+  try {
+    const newId = `t-${Date.now()}`;
+    const cookieStore = await cookies();
+
+    // 1. Attempt Supabase Auth SignUp
+    let supabaseUserId = newId;
+    try {
+      const supabase = await createClient();
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            display_name: full_name,
+            role: 'teacher',
+            department,
+          },
+        },
+      });
+
+      if (!authError && authData.user) {
+        supabaseUserId = authData.user.id;
+        await supabase.from('profiles').upsert({
+          id: authData.user.id,
+          role: 'teacher',
+          display_name: full_name,
+          email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
+    } catch {
+      // Continue with local registration
+    }
+
+    // 2. Add to in-memory staff list
+    const { addAdminTeacher } = await import('@/lib/admin/admin-service');
+    await addAdminTeacher({
+      full_name,
+      email,
+      department,
+      assigned_subject,
+      assigned_class,
+    });
+
+    // 3. Persist to registered_teachers_registry cookie so they can log in anytime
+    const existingCookie = cookieStore.get('registered_teachers_registry');
+    let registeredList: any[] = [];
+    if (existingCookie?.value) {
+      try {
+        registeredList = JSON.parse(existingCookie.value);
+      } catch {}
+    }
+
+    // Avoid duplicate email in registry
+    registeredList = registeredList.filter((t: any) => t.email.toLowerCase() !== email.toLowerCase());
+    registeredList.push({
+      id: supabaseUserId,
+      email,
+      display_name: full_name,
+      role: 'teacher',
+      department,
+      assigned_subject,
+      assigned_class,
+      password, // stored in httpOnly session registry for demo/local persistence
+      created_at: new Date().toISOString(),
+    });
+
+    cookieStore.set('registered_teachers_registry', JSON.stringify(registeredList), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: '/',
+    });
+
+    // If registered from inside the admin dashboard by an administrator, don't overwrite the admin's session
+    if (from_admin === 'true') {
+      return {
+        success: true,
+        message: `Teacher ${full_name} (${email}) has been successfully registered. They can now log into their Staff Dashboard.`,
+        redirectUrl: '/admin/staff',
+      };
+    }
+
+    // Otherwise, this is a teacher registering their own account. Log them in directly to their new dashboard!
+    cookieStore.set(
+      'demo_staff_session',
+      JSON.stringify({
+        id: supabaseUserId,
+        email,
+        display_name: full_name,
+        role: 'teacher',
+        department,
+      }),
+      {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24, // 24 hours
+        path: '/',
+      }
+    );
+
+    return {
+      success: true,
+      message: `Registration successful! Welcome to Greenfield College, ${full_name}. Entering your Staff Dashboard...`,
+      redirectUrl: '/admin',
+    };
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : 'Registration failed';
+    return {
+      success: false,
+      message: errorMsg,
+    };
+  }
+}
+
+export async function getRegisteredTeachersRegistry(): Promise<Array<{
+  id: string;
+  email: string;
+  display_name: string;
+  role: 'teacher';
+  department?: string;
+  assigned_subject?: string;
+  assigned_class?: string;
+  created_at: string;
+}>> {
+  try {
+    const cookieStore = await cookies();
+    const cookie = cookieStore.get('registered_teachers_registry');
+    if (cookie?.value) {
+      const list = JSON.parse(cookie.value);
+      return list.map(({ password, ...rest }: any) => rest);
+    }
+  } catch {}
+  return [];
 }
 
 export async function logoutAdmin() {
