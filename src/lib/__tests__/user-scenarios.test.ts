@@ -2,18 +2,24 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   addAdminStudent,
   getAdminStudents,
+  deleteAdminStudent,
   saveSingleResult,
   getAdminResults,
+  deleteAdminResult,
   getAdminTerms,
   setActiveAdminTerm,
   addAdminTeacher,
   getAdminStaff,
+  deleteAdminStaff,
+  addAdminSubject,
+  getAdminSubjects,
+  deleteAdminSubject,
 } from '@/lib/admin/admin-service';
 import {
   getStudentDashboardData,
   getStudentPublishedResults,
 } from '@/lib/student/student-service';
-import { findStoreStudent } from '@/lib/storage/store';
+import { findStoreStudent, getStoreResults } from '@/lib/storage/store';
 
 describe('User Scenarios: Student Persistence, Identity Isolation, Term Switching & Teacher Management', () => {
   it('Scenario 1: Creates a new student and verifies independent identity', async () => {
@@ -118,5 +124,89 @@ describe('User Scenarios: Student Persistence, Identity Isolation, Term Switchin
     expect(foundTeacher?.display_name).toBe('Mrs. Blessing Nwosu');
     expect(foundTeacher?.assigned_class).toBe('JSS 1B');
     expect(foundTeacher?.role).toBe('teacher');
+  });
+
+  it('Scenario 5: Admin deletes students, subjects, teachers, and results with full integrity', async () => {
+    // 1. Student deletion & cascade result deletion
+    const testStudentId = 'GFS999';
+    await addAdminStudent({
+      student_id: testStudentId,
+      first_name: 'Temporary',
+      last_name: 'Student',
+      class_id: '77777777-7777-7777-7777-777777777771',
+    });
+    expect(findStoreStudent(testStudentId)).toBeDefined();
+
+    // Add a result for this temporary student
+    const tempResult = await saveSingleResult({
+      student_id: testStudentId,
+      subject_id: '88888888-8888-8888-8888-888888888881',
+      class_id: '77777777-7777-7777-7777-777777777771',
+      term_id: '33333333-3333-3333-3333-333333333331',
+      ca_score: 20,
+      exam_score: 50,
+      status: 'draft',
+    });
+    expect(tempResult).toBeDefined();
+
+    // Delete the student
+    const deleteStudentSuccess = await deleteAdminStudent(testStudentId);
+    expect(deleteStudentSuccess).toBe(true);
+    expect(findStoreStudent(testStudentId)).toBeUndefined();
+
+    // Verify cascade: result for this student is also purged
+    const remainingResults = getStoreResults().filter(r => r.student_id === testStudentId);
+    expect(remainingResults.length).toBe(0);
+
+    // 2. Subject creation & deletion
+    const newSubject = await addAdminSubject({
+      name: 'Physical Health Education',
+      code: 'PHE202',
+    });
+    const subjectsBefore = await getAdminSubjects();
+    expect(subjectsBefore.some(s => s.code === 'PHE202')).toBe(true);
+
+    const deleteSubjectSuccess = await deleteAdminSubject(newSubject.id);
+    expect(deleteSubjectSuccess).toBe(true);
+    const subjectsAfter = await getAdminSubjects();
+    expect(subjectsAfter.some(s => s.code === 'PHE202')).toBe(false);
+
+    // 3. Teacher deletion & Admin protection
+    const tempTeacher = await addAdminTeacher({
+      full_name: 'Temp Teacher',
+      email: 'temp.teacher@greenfieldcollege.edu',
+      department: 'Science',
+      assigned_class: 'JSS 2A',
+      assigned_subject: 'Basic Science',
+      password: 'TempPassword123',
+    });
+    expect(tempTeacher).toBeDefined();
+
+    const deleteTeacherSuccess = await deleteAdminStaff(tempTeacher.id);
+    expect(deleteTeacherSuccess).toBe(true);
+    const staffAfter = await getAdminStaff();
+    expect(staffAfter.some(s => s.email === 'temp.teacher@greenfieldcollege.edu')).toBe(false);
+
+    // Verify admin protection against self-deletion
+    await expect(deleteAdminStaff('admin@greenfieldcollege.edu')).rejects.toThrow(
+      'Administrative governance policy prevents deleting the primary Administrator account.'
+    );
+
+    // 4. Result deletion
+    const resToDelete = await saveSingleResult({
+      student_id: 'GFS088',
+      subject_id: '88888888-8888-8888-8888-888888888882', // English
+      class_id: '77777777-7777-7777-7777-777777777771',
+      term_id: '33333333-3333-3333-3333-333333333331',
+      ca_score: 25,
+      exam_score: 55,
+      status: 'draft',
+    });
+    expect(resToDelete).toBeDefined();
+
+    const deleteResultSuccess = await deleteAdminResult(resToDelete.id);
+    expect(deleteResultSuccess).toBe(true);
+    const adminResultsAfter = await getAdminResults();
+    expect(adminResultsAfter.some(r => r.id === resToDelete.id)).toBe(false);
   });
 });

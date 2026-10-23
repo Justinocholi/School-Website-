@@ -85,3 +85,38 @@ export async function setActiveTermAction(formData: FormData): Promise<void> {
   }
 }
 
+export async function deleteSubjectAction(subjectId: string): Promise<{ success: boolean; message: string }> {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return { success: false, message: 'Access denied: Only School Administrators can delete curriculum subjects.' };
+  }
+
+  try {
+    const { deleteAdminSubject } = await import('@/lib/admin/admin-service');
+    await deleteAdminSubject(subjectId);
+    revalidatePath('/admin/subjects');
+    revalidatePath('/admin/results/entry');
+    return { success: true, message: 'Subject deleted successfully.' };
+  } catch (err: unknown) {
+    return { success: false, message: err instanceof Error ? err.message : 'Failed to delete subject' };
+  }
+}
+
+export async function deleteClassAction(classId: string): Promise<{ success: boolean; message: string }> {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return { success: false, message: 'Access denied: Only School Administrators can delete class divisions.' };
+  }
+
+  try {
+    const { deleteAdminClass } = await import('@/lib/admin/admin-service');
+    await deleteAdminClass(classId);
+    revalidatePath('/admin/classes');
+    revalidatePath('/admin/results/entry');
+    return { success: true, message: 'Class deleted successfully.' };
+  } catch (err: unknown) {
+    return { success: false, message: err instanceof Error ? err.message : 'Failed to delete class' };
+  }
+}
+
+

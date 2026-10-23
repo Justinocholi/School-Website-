@@ -58,3 +58,33 @@ export async function createStudentAction(
     };
   }
 }
+
+export async function deleteStudentAction(studentId: string): Promise<{ success: boolean; message: string }> {
+  const { getAuthenticatedStaff } = await import('@/app/actions/admin-auth');
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return {
+      success: false,
+      message: 'Access denied: Only School Administrators can delete student accounts.',
+    };
+  }
+
+  try {
+    const { deleteAdminStudent } = await import('@/lib/admin/admin-service');
+    await deleteAdminStudent(studentId);
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/admin/students');
+    revalidatePath('/admin');
+    revalidatePath('/admin/results');
+    return {
+      success: true,
+      message: `Student account ${studentId} has been successfully deleted.`,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : 'Failed to delete student',
+    };
+  }
+}
+

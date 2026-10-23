@@ -540,3 +540,38 @@ export async function getAuthenticatedStaff(): Promise<StaffAuthContext | null> 
 }
 
 export const getAuthenticatedAdmin = getAuthenticatedStaff;
+
+export async function deleteStaffAction(staffId: string): Promise<{ success: boolean; message: string }> {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return {
+      success: false,
+      message: 'Access denied: Only School Administrators can remove staff accounts.',
+    };
+  }
+
+  if (staff.id === staffId || staff.email === staffId) {
+    return {
+      success: false,
+      message: 'Self-deletion restricted: An administrator cannot delete their own active session account.',
+    };
+  }
+
+  try {
+    const { deleteAdminStaff } = await import('@/lib/admin/admin-service');
+    await deleteAdminStaff(staffId);
+    const { revalidatePath } = await import('next/cache');
+    revalidatePath('/admin/staff');
+    revalidatePath('/admin');
+    return {
+      success: true,
+      message: 'Staff member account removed successfully.',
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : 'Failed to remove staff account',
+    };
+  }
+}
+

@@ -13,7 +13,8 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { getAdminStaff, getAdminClasses, getAdminSubjects } from '@/lib/admin/admin-service';
-import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
+import { getAuthenticatedStaff, deleteStaffAction } from '@/app/actions/admin-auth';
+import { DeleteConfirmButton } from '@/components/admin/DeleteConfirmButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -56,7 +57,7 @@ export default async function AdminStaffPage() {
             Class & Form Teachers Roster
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Directory of assigned form teachers and portal accounts. Each form teacher handles and compiles results solely for their designated class arm.
+            Directory of assigned form teachers and portal accounts. As administrator, you have full authority to onboard or remove faculty accounts.
           </p>
         </div>
       </div>
@@ -128,6 +129,7 @@ export default async function AdminStaffPage() {
                     <th className="py-3 px-4 font-semibold">Department</th>
                     <th className="py-3 px-4 text-center font-semibold">Portal Role</th>
                     <th className="py-3 px-4 text-center font-semibold">Status</th>
+                    <th className="py-3 px-4 text-right font-semibold">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
@@ -178,6 +180,18 @@ export default async function AdminStaffPage() {
                           <Badge variant="success" className="text-[10px]">
                             ACTIVE
                           </Badge>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          {member.role === 'administrator' ? (
+                            <span className="text-[11px] text-gray-400 italic">Protected</span>
+                          ) : (
+                            <DeleteConfirmButton
+                              itemId={member.id}
+                              itemName={member.display_name}
+                              itemType="teacher"
+                              onDelete={deleteStaffAction}
+                            />
+                          )}
                         </td>
                       </tr>
                     );

@@ -133,3 +133,32 @@ export async function correctPublishedResultAction(
     };
   }
 }
+
+export async function deleteResultAction(resultId: string): Promise<{ success: boolean; message: string }> {
+  const staff = await getAuthenticatedStaff();
+  if (staff?.role !== 'administrator') {
+    return {
+      success: false,
+      message: 'Access denied: Only School Administrators can delete examination results.',
+    };
+  }
+
+  try {
+    const { deleteAdminResult } = await import('@/lib/admin/admin-service');
+    await deleteAdminResult(resultId);
+    revalidatePath('/admin/results');
+    revalidatePath('/admin/results/review');
+    revalidatePath('/student/results');
+    revalidatePath('/student');
+    return {
+      success: true,
+      message: 'Result record deleted successfully.',
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : 'Failed to delete result',
+    };
+  }
+}
+

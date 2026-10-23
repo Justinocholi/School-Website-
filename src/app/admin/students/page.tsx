@@ -18,6 +18,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DeleteConfirmButton } from '@/components/admin/DeleteConfirmButton';
+import { deleteStudentAction } from '@/app/actions/admin-student';
 
 export const metadata: Metadata = {
   title: 'Student Management',
@@ -161,12 +163,20 @@ export default async function AdminStudentsPage({
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="inline-flex items-center gap-1">
+                      <div className="inline-flex items-center gap-1.5 justify-end">
                         <Link href={`/admin/students/${s.id}`}>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-600">
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-600 hover:text-emerald-800">
                             Edit
                           </Button>
                         </Link>
+                        {isAdmin && (
+                          <DeleteConfirmButton
+                            itemId={s.id}
+                            itemName={`${s.first_name} ${s.last_name}`}
+                            itemType="student"
+                            onDelete={deleteStudentAction}
+                          />
+                        )}
                       </div>
                     </td>
                   </tr>

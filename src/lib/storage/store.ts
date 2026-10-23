@@ -462,3 +462,64 @@ export function saveStoreSubject(s: SubjectRecord): void {
 export function getStoreSessions(): AcademicSession[] {
   return readStore().sessions;
 }
+
+export function deleteStoreStudent(studentIdOrId: string): boolean {
+  const store = readStore();
+  const norm = studentIdOrId.trim().toUpperCase();
+  const initialLen = store.students.length;
+  store.students = store.students.filter(
+    s => s.id !== studentIdOrId && s.student_id.toUpperCase() !== norm
+  );
+  // Also remove associated results
+  store.results = store.results.filter(
+    r => r.student_id !== studentIdOrId && r.student?.student_id.toUpperCase() !== norm && r.student?.id !== studentIdOrId
+  );
+  writeStore(store);
+  return store.students.length < initialLen;
+}
+
+export function deleteStoreSubject(subjectIdOrCode: string): boolean {
+  const store = readStore();
+  const norm = subjectIdOrCode.trim().toLowerCase();
+  const initialLen = store.subjects.length;
+  store.subjects = store.subjects.filter(
+    s => s.id !== subjectIdOrCode && s.code.toLowerCase() !== norm && s.name.toLowerCase() !== norm
+  );
+  // Also remove results for this subject
+  store.results = store.results.filter(
+    r => r.subject_id !== subjectIdOrCode && r.subject?.id !== subjectIdOrCode && r.subject?.code.toLowerCase() !== norm
+  );
+  writeStore(store);
+  return store.subjects.length < initialLen;
+}
+
+export function deleteStoreStaff(staffIdOrEmail: string): boolean {
+  const store = readStore();
+  const norm = staffIdOrEmail.trim().toLowerCase();
+  const initialLen = store.staff.length;
+  store.staff = store.staff.filter(
+    s => s.id !== staffIdOrEmail && s.email.toLowerCase() !== norm
+  );
+  writeStore(store);
+  return store.staff.length < initialLen;
+}
+
+export function deleteStoreClass(classIdOrName: string): boolean {
+  const store = readStore();
+  const norm = classIdOrName.trim().toLowerCase();
+  const initialLen = store.classes.length;
+  store.classes = store.classes.filter(
+    c => c.id !== classIdOrName && c.name.toLowerCase() !== norm
+  );
+  writeStore(store);
+  return store.classes.length < initialLen;
+}
+
+export function deleteStoreResult(resultId: string): boolean {
+  const store = readStore();
+  const initialLen = store.results.length;
+  store.results = store.results.filter(r => r.id !== resultId);
+  writeStore(store);
+  return store.results.length < initialLen;
+}
+

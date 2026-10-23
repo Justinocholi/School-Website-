@@ -3,6 +3,8 @@ import { Metadata } from 'next';
 import { BookOpen, PlusCircle } from 'lucide-react';
 import { getAdminSubjects } from '@/lib/admin/admin-service';
 import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
+import { deleteSubjectAction } from '@/app/actions/admin-academics';
+import { DeleteConfirmButton } from '@/components/admin/DeleteConfirmButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CreateSubjectForm } from '@/components/admin/CreateSubjectForm';
@@ -29,7 +31,7 @@ export default async function AdminSubjectsPage() {
         </h1>
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
           {isAdmin
-            ? 'Define subject codes and manage accredited courses taught at Greenfield College.'
+            ? 'Define subject codes, manage accredited courses, or delete unused curriculum items at Greenfield College.'
             : 'View curriculum subjects, course descriptions, and official subject codes.'}
         </p>
       </div>
@@ -45,6 +47,9 @@ export default async function AdminSubjectsPage() {
                     <th className="py-3 px-4 font-semibold">Subject Code</th>
                     <th className="py-3 px-4 font-semibold">Subject Title</th>
                     <th className="py-3 px-4 text-center font-semibold">Status</th>
+                    {isAdmin && (
+                      <th className="py-3 px-4 text-right font-semibold">Action</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
@@ -61,6 +66,16 @@ export default async function AdminSubjectsPage() {
                           {s.status.toUpperCase()}
                         </Badge>
                       </td>
+                      {isAdmin && (
+                        <td className="py-3.5 px-4 text-right">
+                          <DeleteConfirmButton
+                            itemId={s.id}
+                            itemName={`${s.name} (${s.code})`}
+                            itemType="subject"
+                            onDelete={deleteSubjectAction}
+                          />
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

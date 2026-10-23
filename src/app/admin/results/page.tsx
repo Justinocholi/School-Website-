@@ -18,6 +18,8 @@ import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DeleteConfirmButton } from '@/components/admin/DeleteConfirmButton';
+import { deleteResultAction } from '@/app/actions/admin-results';
 
 export const metadata: Metadata = {
   title: 'Academic Results Management',
@@ -180,12 +182,13 @@ export default async function AdminResultsPage({
                 <th className="py-3 px-4 text-center font-semibold">Grade</th>
                 <th className="py-3 px-4 text-center font-semibold">Status</th>
                 <th className="py-3 px-4 text-right font-semibold">Remarks</th>
+                {isAdmin && <th className="py-3 px-4 text-right font-semibold">Action</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
               {results.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-gray-500 text-xs">
+                  <td colSpan={isAdmin ? 9 : 8} className="py-8 text-center text-gray-500 text-xs">
                     No results found matching your filters.
                   </td>
                 </tr>
@@ -225,6 +228,16 @@ export default async function AdminResultsPage({
                     <td className="py-3 px-4 text-right text-xs text-gray-500">
                       {r.remarks}
                     </td>
+                    {isAdmin && (
+                      <td className="py-3 px-4 text-right">
+                        <DeleteConfirmButton
+                          itemId={r.id}
+                          itemName={`${r.student?.student_id || r.student_id} - ${r.subject?.code || r.subject?.name || 'Result'}`}
+                          itemType="result"
+                          onDelete={deleteResultAction}
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

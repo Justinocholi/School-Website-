@@ -2,8 +2,11 @@ import React from 'react';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, User, KeyRound, ShieldAlert, CheckCircle2 } from 'lucide-react';
-import { getAdminStudents, getAdminClasses } from '@/lib/admin/admin-service';
+import { ArrowLeft, User, KeyRound, AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { getAdminStudents } from '@/lib/admin/admin-service';
+import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
+import { deleteStudentAction } from '@/app/actions/admin-student';
+import { DeleteConfirmButton } from '@/components/admin/DeleteConfirmButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,12 +22,18 @@ export default async function AdminStudentDetailPage({
   params: Promise<{ studentId: string }>;
 }) {
   const { studentId } = await params;
-  const students = await getAdminStudents();
-  const student = students.find((s) => s.id === studentId || s.student_id === studentId);
+  const [students, staff] = await Promise.all([
+    getAdminStudents(),
+    getAuthenticatedStaff(),
+  ]);
+
+  const student = students.find((s) => s.id === studentId || s.student_id.toUpperCase() === studentId.toUpperCase());
 
   if (!student) {
     notFound();
   }
+
+  const isAdmin = staff?.role === 'administrator';
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -88,6 +97,41 @@ export default async function AdminStudentDetailPage({
           </div>
         </CardContent>
       </Card>
+
+      {/* Danger Zone: Admin Account Deletion */}
+      {isAdmin && (
+        <Card className="border-rose-200 bg-rose-50/40 shadow-xs">
+          <CardHeader className="py-4 border-b border-rose-100">
+            <CardTitle className="text-sm font-bold text-rose-900 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-700" />
+              <span>Administrative Removal & Data Erasure</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold text-rose-950">
+                Permanently Delete Student Account
+              </p>
+              <p className="text-[11px] text-rose-700 mt-0.5 max-w-lg leading-relaxed">
+                If {student.first_name} {student.last_name} ({student.student_id}) is no longer enrolled at Greenfield College, you can permanently erase their portal account and recorded assessments. This action cannot be undone.
+              </p>
+            </div>
+            <div className="shrink-0">
+              <DeleteConfirmButton
+                itemId={student.id}
+                itemName={`${student.first_name} ${student.last_name} (${student.student_id})`}
+                itemType="student"
+                onDelete={deleteStudentAction}
+                redirectUrl="/admin/students"
+                showLabel
+                variant="destructive"
+                size="sm"
+                className="bg-rose-700 hover:bg-rose-800 text-white font-bold"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

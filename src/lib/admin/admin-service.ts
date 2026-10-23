@@ -28,6 +28,11 @@ import {
   saveStoreSubject,
   getStoreSessions,
   getStoreActiveTermId,
+  deleteStoreStudent,
+  deleteStoreSubject,
+  deleteStoreStaff,
+  deleteStoreClass,
+  deleteStoreResult,
 } from '@/lib/storage/store';
 
 let mockAuditLogs: AuditLog[] = [
@@ -673,3 +678,133 @@ export async function addAdminTeacher(data: {
 
   return newStaff;
 }
+
+export async function deleteAdminStudent(studentIdOrId: string): Promise<boolean> {
+  const student = findStoreStudent(studentIdOrId);
+  const success = deleteStoreStudent(studentIdOrId);
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      await supabase
+        .from('students')
+        .delete()
+        .or(`id.eq.${studentIdOrId},student_id.eq.${studentIdOrId.toUpperCase()}`);
+    } catch {}
+  }
+
+  recordAuditLog('DELETE_STUDENT', 'students', studentIdOrId, {
+    student_id: student?.student_id || studentIdOrId,
+    name: student ? `${student.first_name} ${student.last_name}` : 'Unknown',
+  });
+
+  return success;
+}
+
+export async function deleteAdminSubject(subjectId: string): Promise<boolean> {
+  const subjects = getStoreSubjects();
+  const subject = subjects.find(s => s.id === subjectId || s.code.toLowerCase() === subjectId.toLowerCase());
+  const success = deleteStoreSubject(subjectId);
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      await supabase.from('subjects').delete().eq('id', subjectId);
+    } catch {}
+  }
+
+  recordAuditLog('DELETE_SUBJECT', 'subjects', subjectId, {
+    name: subject?.name,
+    code: subject?.code,
+  });
+
+  return success;
+}
+
+export async function deleteAdminStaff(staffId: string): Promise<boolean> {
+  const staffList = getStoreStaff();
+  const member = staffList.find(s => s.id === staffId || s.email.toLowerCase() === staffId.toLowerCase());
+
+  // Protect administrator account from accidental self-deletion
+  if (member?.role === 'administrator') {
+    throw new Error('Administrative governance policy prevents deleting the primary Administrator account.');
+  }
+
+  const success = deleteStoreStaff(staffId);
+
+  // Also remove from registered_teachers_registry cookie if present
+  try {
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const regCookie = cookieStore.get('registered_teachers_registry');
+    if (regCookie?.value) {
+      let dynamicList = JSON.parse(regCookie.value);
+      dynamicList = dynamicList.filter(
+        (t: any) => t.id !== staffId && t.email.toLowerCase() !== staffId.toLowerCase()
+      );
+      cookieStore.set('registered_teachers_registry', JSON.stringify(dynamicList), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      });
+    }
+  } catch {}
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      await supabase.from('profiles').delete().eq('id', staffId);
+    } catch {}
+  }
+
+  recordAuditLog('DELETE_STAFF', 'staff', staffId, {
+    name: member?.display_name,
+    email: member?.email,
+    role: member?.role,
+  });
+
+  return success;
+}
+
+export async function deleteAdminClass(classId: string): Promise<boolean> {
+  const classes = getStoreClasses();
+  const cls = classes.find(c => c.id === classId || c.name.toLowerCase() === classId.toLowerCase());
+  const success = deleteStoreClass(classId);
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      await supabase.from('classes').delete().eq('id', classId);
+    } catch {}
+  }
+
+  recordAuditLog('DELETE_CLASS', 'classes', classId, {
+    name: cls?.name,
+    level: cls?.level,
+  });
+
+  return success;
+}
+
+export async function deleteAdminResult(resultId: string): Promise<boolean> {
+  const results = getStoreResults();
+  const result = results.find(r => r.id === resultId);
+  const success = deleteStoreResult(resultId);
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      await supabase.from('results').delete().eq('id', resultId);
+    } catch {}
+  }
+
+  recordAuditLog('DELETE_RESULT', 'results', resultId, {
+    student_id: result?.student_id,
+    subject_id: result?.subject_id,
+    term_id: result?.term_id,
+  });
+
+  return success;
+}
+

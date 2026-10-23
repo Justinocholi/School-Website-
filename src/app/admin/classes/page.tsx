@@ -3,6 +3,8 @@ import { Metadata } from 'next';
 import { Layers, PlusCircle, Users, CheckCircle2 } from 'lucide-react';
 import { getAdminClasses } from '@/lib/admin/admin-service';
 import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
+import { deleteClassAction } from '@/app/actions/admin-academics';
+import { DeleteConfirmButton } from '@/components/admin/DeleteConfirmButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CreateClassForm } from '@/components/admin/CreateClassForm';
@@ -29,7 +31,7 @@ export default async function AdminClassesPage() {
         </h1>
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
           {isAdmin
-            ? 'Configure class divisions across Junior Secondary and Senior Secondary pathways.'
+            ? 'Configure or remove class divisions across Junior Secondary and Senior Secondary pathways.'
             : 'View enrolled classes, scholar counts, and active secondary arms.'}
         </p>
       </div>
@@ -46,6 +48,9 @@ export default async function AdminClassesPage() {
                     <th className="py-3 px-4 font-semibold">Academic Level</th>
                     <th className="py-3 px-4 text-center font-semibold">Enrolled Students</th>
                     <th className="py-3 px-4 text-center font-semibold">Status</th>
+                    {isAdmin && (
+                      <th className="py-3 px-4 text-right font-semibold">Action</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
@@ -72,6 +77,16 @@ export default async function AdminClassesPage() {
                             {c.status.toUpperCase()}
                           </Badge>
                         </td>
+                        {isAdmin && (
+                          <td className="py-3.5 px-4 text-right">
+                            <DeleteConfirmButton
+                              itemId={c.id}
+                              itemName={c.name}
+                              itemType="class"
+                              onDelete={deleteClassAction}
+                            />
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
