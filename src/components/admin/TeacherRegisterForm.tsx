@@ -2,23 +2,18 @@
 
 import React, { useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
-  Shield,
   UserCheck,
   Mail,
   Lock,
-  BookOpen,
   Layers,
   ArrowRight,
-  GraduationCap,
-  Building,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { registerTeacherAction, TeacherRegisterResult } from '@/app/actions/admin-auth';
 import { ClassRecord, SubjectRecord } from '@/types/database.types';
 
@@ -33,56 +28,47 @@ interface TeacherRegisterFormProps {
   fromAdmin?: boolean;
 }
 
-const DEPARTMENTS = [
-  'Mathematics & Computing',
-  'Natural Sciences & Physics',
-  'Languages, Literature & English',
-  'Humanities & Social Sciences',
-  'Commercial & Business Studies',
-  'Vocational, Creative & Technical Arts',
-];
-
 export function TeacherRegisterForm({
   classes = [],
   subjects = [],
-  fromAdmin = false,
+  fromAdmin = true,
 }: TeacherRegisterFormProps) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(registerTeacherAction, initialState);
 
   useEffect(() => {
     if (state.success && state.redirectUrl) {
-      router.push(state.redirectUrl);
+      router.refresh();
     }
   }, [state, router]);
 
   return (
     <Card className="border-gray-200 shadow-md">
-      <CardContent className="p-6 sm:p-8 space-y-6">
+      <CardContent className="p-6 space-y-5">
         {state.message && (
           <Alert
             variant={state.success ? 'success' : 'destructive'}
-            title={state.success ? 'Account Created' : 'Registration Notice'}
+            title={state.success ? 'Class Teacher Created' : 'Onboarding Notice'}
           >
             {state.message}
           </Alert>
         )}
 
         <form action={formAction} className="space-y-4">
-          {fromAdmin && <input type="hidden" name="from_admin" value="true" />}
+          <input type="hidden" name="from_admin" value="true" />
 
           {/* Full Name & Title */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-gray-700">
-              Full Name with Title <span className="text-rose-500">*</span>
+              Teacher Name with Title <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <Input
                 name="full_name"
                 type="text"
-                placeholder="e.g. Dr. Chioma Eze or Mr. Babatunde Fashola"
+                placeholder="e.g. Mr. David Adeleke or Mrs. Grace Danjuma"
                 required
-                className="font-medium"
+                className="font-medium text-xs"
               />
             </div>
             {state.errors?.full_name && (
@@ -93,95 +79,62 @@ export function TeacherRegisterForm({
           {/* Staff Email */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-gray-700">
-              Official Staff Email <span className="text-rose-500">*</span>
+              Staff Official Email <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <Input
                 name="email"
                 type="email"
-                placeholder="e.g. chioma.eze@greenfieldcollege.edu"
+                placeholder="e.g. david.adeleke@greenfieldcollege.edu"
                 required
-                className="font-medium"
+                className="font-medium text-xs"
               />
             </div>
             <p className="text-[11px] text-gray-500">
-              This email will be your unique staff login credential.
+              This email will serve as the teacher&apos;s login username.
             </p>
             {state.errors?.email && (
               <p className="text-xs text-rose-600">{state.errors.email[0]}</p>
             )}
           </div>
 
-          {/* Academic Department */}
+          {/* Assigned Form Class (CRITICAL) */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-gray-700">
-              Academic Department <span className="text-rose-500">*</span>
+              Assigned Class / Arm (Form Class) <span className="text-rose-500">*</span>
             </label>
             <select
-              name="department"
+              name="assigned_class"
               required
-              defaultValue={DEPARTMENTS[0]}
-              className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-medium"
+              defaultValue={classes[0]?.name || 'JSS 1A'}
+              className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-bold"
             >
-              {DEPARTMENTS.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.name}>
+                  {cls.name} ({cls.level}) — Form Teacher
                 </option>
               ))}
             </select>
-            {state.errors?.department && (
-              <p className="text-xs text-rose-600">{state.errors.department[0]}</p>
+            <p className="text-[11px] text-emerald-700 font-medium">
+              &bull; This teacher will solely manage students and upload/compile results for this class arm.
+            </p>
+            {state.errors?.assigned_class && (
+              <p className="text-xs text-rose-600">{state.errors.assigned_class[0]}</p>
             )}
           </div>
 
-          {/* Subject & Class Allocation Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-gray-700">
-                Primary Subject Taught
-              </label>
-              <select
-                name="assigned_subject"
-                className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-medium"
-              >
-                <option value="General Curriculum">General Curriculum</option>
-                {subjects.map((sub) => (
-                  <option key={sub.id} value={sub.name}>
-                    {sub.name} ({sub.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-gray-700">
-                Assigned Class
-              </label>
-              <select
-                name="assigned_class"
-                className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-medium"
-              >
-                <option value="All Classes">All Classes / Multi-class</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.name}>
-                    {cls.name} ({cls.level})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           {/* Passwords */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-gray-700">
-                Password <span className="text-rose-500">*</span>
+                Initial Password <span className="text-rose-500">*</span>
               </label>
               <Input
                 name="password"
                 type="password"
                 required
                 placeholder="••••••••••••"
+                className="text-xs"
               />
               {state.errors?.password && (
                 <p className="text-xs text-rose-600">{state.errors.password[0]}</p>
@@ -197,6 +150,7 @@ export function TeacherRegisterForm({
                 type="password"
                 required
                 placeholder="••••••••••••"
+                className="text-xs"
               />
               {state.errors?.confirm_password && (
                 <p className="text-xs text-rose-600">{state.errors.confirm_password[0]}</p>
@@ -209,36 +163,20 @@ export function TeacherRegisterForm({
             <Button
               type="submit"
               disabled={isPending}
-              className="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-semibold py-2.5 rounded-lg transition-colors gap-2"
+              className="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-semibold py-2.5 rounded-lg transition-colors gap-2 text-xs"
             >
               {isPending ? (
-                <span>Creating Faculty Account...</span>
+                <span>Creating Class Teacher Account...</span>
               ) : (
                 <>
-                  <UserCheck className="w-4 h-4 text-amber-400" />
-                  <span>
-                    {fromAdmin ? 'Register Academic Staff' : 'Create Account & Enter Dashboard'}
-                  </span>
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <span>Onboard Class Teacher</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </Button>
           </div>
         </form>
-
-        {!fromAdmin && (
-          <div className="pt-2 border-t border-gray-100 text-center">
-            <p className="text-xs text-gray-600">
-              Already have an academic staff or admin account?{' '}
-              <Link
-                href="/admin-login"
-                className="font-bold text-emerald-800 hover:text-emerald-950 underline"
-              >
-                Sign In to Staff Portal
-              </Link>
-            </p>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

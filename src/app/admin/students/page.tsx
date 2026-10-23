@@ -30,8 +30,16 @@ export default async function AdminStudentsPage({
   searchParams: Promise<{ q?: string; classId?: string; status?: string }>;
 }) {
   const { q, classId, status } = await searchParams;
-  const students = await getAdminStudents(q, classId, status);
-  const classes = await getAdminClasses();
+  const { getAuthenticatedStaff } = await import('@/app/actions/admin-auth');
+  const staff = await getAuthenticatedStaff();
+  const isAdmin = staff?.role === 'administrator';
+
+  const effectiveClassId = !isAdmin && staff?.assigned_class ? staff.assigned_class : classId;
+
+  const [students, classes] = await Promise.all([
+    getAdminStudents(q, effectiveClassId, status),
+    getAdminClasses(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -39,10 +47,12 @@ export default async function AdminStudentsPage({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
-            Student Roster Management
+            {isAdmin ? 'Student Roster Management' : `Class Roster — ${staff?.assigned_class || 'Form Class'}`}
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-            View, filter, edit, and manage enrolled scholars and their portal accounts.
+            {isAdmin
+              ? 'View, filter, edit, and manage enrolled scholars and their portal accounts.'
+              : `Enrolled scholars in ${staff?.assigned_class}. As Form Teacher, you compile assessments and report cards for these scholars.`}
           </p>
         </div>
 
@@ -76,18 +86,28 @@ export default async function AdminStudentsPage({
             </div>
 
             <div className="sm:col-span-4">
-              <select
-                name="classId"
-                defaultValue={classId || ''}
-                className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
-              >
-                <option value="">All Classes</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              {!isAdmin && staff?.assigned_class ? (
+                <div>
+                  <input type="hidden" name="classId" value={effectiveClassId} />
+                  <div className="flex h-10 w-full items-center justify-between rounded-lg border border-gray-300 bg-slate-100 px-3 py-2 text-xs font-bold text-gray-700">
+                    <span>{staff.assigned_class}</span>
+                    <Badge variant="outline" className="text-[10px]">Form Class Locked</Badge>
+                  </div>
+                </div>
+              ) : (
+                <select
+                  name="classId"
+                  defaultValue={classId || ''}
+                  className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                >
+                  <option value="">All Classes</option>
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div className="sm:col-span-2">

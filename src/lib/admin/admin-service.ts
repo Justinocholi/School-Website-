@@ -60,9 +60,9 @@ let mockStaff: StaffRecord[] = [
     email: 'david.adeleke@greenfieldcollege.edu',
     display_name: 'Mr. David Adeleke',
     role: 'teacher',
-    department: 'Mathematics & Sciences',
-    assigned_subject: 'Mathematics',
-    assigned_class: 'SS 1 Science',
+    department: 'Junior Secondary (Form Teacher)',
+    assigned_subject: 'General Curriculum',
+    assigned_class: 'JSS 1A',
     created_at: '2026-09-01T08:00:00Z',
     status: 'active',
   },
@@ -71,8 +71,8 @@ let mockStaff: StaffRecord[] = [
     email: 'grace.danjuma@greenfieldcollege.edu',
     display_name: 'Mrs. Grace Danjuma',
     role: 'teacher',
-    department: 'Languages & Humanities',
-    assigned_subject: 'English Language',
+    department: 'Junior Secondary (Form Teacher)',
+    assigned_subject: 'General Curriculum',
     assigned_class: 'JSS 2A',
     created_at: '2026-09-01T08:00:00Z',
     status: 'active',
@@ -82,9 +82,9 @@ let mockStaff: StaffRecord[] = [
     email: 'samuel.osei@greenfieldcollege.edu',
     display_name: 'Mr. Samuel Osei',
     role: 'teacher',
-    department: 'Basic Sciences & Computing',
-    assigned_subject: 'Basic Science',
-    assigned_class: 'JSS 1A',
+    department: 'Senior Secondary (Form Teacher)',
+    assigned_subject: 'General Curriculum',
+    assigned_class: 'SS 1 Science',
     created_at: '2026-09-01T08:00:00Z',
     status: 'active',
   },
@@ -132,6 +132,42 @@ let mockStudents: StudentRecord[] = [
     student_id: 'GFS004',
     first_name: 'Amina',
     last_name: 'Bello',
+    class_id: '77777777-7777-7777-7777-777777777771',
+    admission_date: '2026-09-01',
+    status: 'active',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    class: { id: '77777777-7777-7777-7777-777777777771', name: 'JSS 1A', level: 'JSS 1', status: 'active', created_at: '' },
+  },
+  {
+    id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    student_id: 'GFS005',
+    first_name: 'Chinedu',
+    last_name: 'Eze',
+    class_id: '77777777-7777-7777-7777-777777777771',
+    admission_date: '2026-09-01',
+    status: 'active',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    class: { id: '77777777-7777-7777-7777-777777777771', name: 'JSS 1A', level: 'JSS 1', status: 'active', created_at: '' },
+  },
+  {
+    id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    student_id: 'GFS006',
+    first_name: 'Fatima',
+    last_name: 'Aliyu',
+    class_id: '77777777-7777-7777-7777-777777777771',
+    admission_date: '2026-09-01',
+    status: 'active',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    class: { id: '77777777-7777-7777-7777-777777777771', name: 'JSS 1A', level: 'JSS 1', status: 'active', created_at: '' },
+  },
+  {
+    id: 'gggggggg-gggg-gggg-gggg-gggggggggggg',
+    student_id: 'GFS007',
+    first_name: 'Tunde',
+    last_name: 'Bakare',
     class_id: '77777777-7777-7777-7777-777777777771',
     admission_date: '2026-09-01',
     status: 'active',
@@ -198,20 +234,40 @@ function isSupabaseConfigured(): boolean {
   return !url.includes('placeholder') && !key.includes('placeholder') && url.startsWith('http');
 }
 
-export async function getAdminOverviewStats() {
+export async function getAdminOverviewStats(classFilter?: string) {
   if (isSupabaseConfigured()) {
     try {
       const supabase = await createClient();
-      const { count: studentCount } = await supabase.from('students').select('*', { count: 'exact', head: true });
-      const { count: classCount } = await supabase.from('classes').select('*', { count: 'exact', head: true });
-      const { count: subjectCount } = await supabase.from('subjects').select('*', { count: 'exact', head: true });
-      const { count: pendingResultCount } = await supabase.from('results').select('*', { count: 'exact', head: true }).eq('status', 'pending_review');
-      const { count: publishedResultCount } = await supabase.from('results').select('*', { count: 'exact', head: true }).eq('status', 'published');
+      let studentQ = supabase.from('students').select('*', { count: 'exact', head: true });
+      let pendingResultQ = supabase.from('results').select('*', { count: 'exact', head: true }).eq('status', 'pending_review');
+      let publishedResultQ = supabase.from('results').select('*', { count: 'exact', head: true }).eq('status', 'published');
+
+      if (classFilter) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classFilter);
+        let targetClassId: string | undefined = isUuid ? classFilter : undefined;
+        if (!targetClassId) {
+          const { data: cls } = await supabase.from('classes').select('id').ilike('name', classFilter).maybeSingle();
+          targetClassId = cls?.id;
+        }
+        if (targetClassId) {
+          studentQ = studentQ.eq('class_id', targetClassId);
+          pendingResultQ = pendingResultQ.eq('class_id', targetClassId);
+          publishedResultQ = publishedResultQ.eq('class_id', targetClassId);
+        }
+      }
+
+      const [{ count: studentCount }, { count: classCount }, { count: subjectCount }, { count: pendingResultCount }, { count: publishedResultCount }] = await Promise.all([
+        studentQ,
+        supabase.from('classes').select('*', { count: 'exact', head: true }),
+        supabase.from('subjects').select('*', { count: 'exact', head: true }),
+        pendingResultQ,
+        publishedResultQ,
+      ]);
 
       if (studentCount !== null && studentCount !== undefined) {
         return {
           totalStudents: studentCount,
-          totalClasses: classCount || mockClasses.length,
+          totalClasses: classFilter ? 1 : (classCount || mockClasses.length),
           totalSubjects: subjectCount || mockSubjects.length,
           pendingResults: pendingResultCount || 0,
           publishedResults: publishedResultCount || 0,
@@ -224,12 +280,21 @@ export async function getAdminOverviewStats() {
     }
   }
 
+  let students = [...mockStudents];
+  let results = [...mockResults];
+
+  if (classFilter) {
+    const cfLower = classFilter.toLowerCase();
+    students = students.filter(s => s.class?.name.toLowerCase() === cfLower || s.class_id === classFilter || s.class?.id === classFilter);
+    results = results.filter(r => r.class?.name.toLowerCase() === cfLower || r.class_id === classFilter || r.class?.id === classFilter);
+  }
+
   return {
-    totalStudents: mockStudents.length,
-    totalClasses: mockClasses.length,
+    totalStudents: students.length,
+    totalClasses: classFilter ? 1 : mockClasses.length,
     totalSubjects: mockSubjects.length,
-    pendingResults: mockResults.filter(r => r.status === 'pending_review').length,
-    publishedResults: mockResults.filter(r => r.status === 'published').length,
+    pendingResults: results.filter(r => r.status === 'pending_review').length,
+    publishedResults: results.filter(r => r.status === 'published').length,
     recentImports: mockImportJobs.slice(0, 5),
     recentActivity: mockAuditLogs.slice(0, 5),
   };
@@ -244,7 +309,17 @@ export async function getAdminStudents(query?: string, classId?: string, status?
         .select('*, class:classes(id, name, level)')
         .order('student_id');
 
-      if (classId) q = q.eq('class_id', classId);
+      if (classId) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classId);
+        if (isUuid) {
+          q = q.eq('class_id', classId);
+        } else {
+          const { data: cls } = await supabase.from('classes').select('id').ilike('name', classId).maybeSingle();
+          if (cls?.id) {
+            q = q.eq('class_id', cls.id);
+          }
+        }
+      }
       if (status) q = q.eq('status', status);
 
       const { data, error } = await q;
@@ -275,7 +350,8 @@ export async function getAdminStudents(query?: string, classId?: string, status?
     );
   }
   if (classId) {
-    list = list.filter(s => s.class_id === classId);
+    const cLower = classId.toLowerCase();
+    list = list.filter(s => s.class_id === classId || s.class?.id === classId || s.class?.name.toLowerCase() === cLower);
   }
   if (status) {
     list = list.filter(s => s.status === status);
@@ -545,7 +621,17 @@ export async function getAdminResults(filters?: { termId?: string; classId?: str
         .order('created_at', { ascending: false });
 
       if (filters?.termId) q = q.eq('term_id', filters.termId);
-      if (filters?.classId) q = q.eq('class_id', filters.classId);
+      if (filters?.classId) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.classId);
+        if (isUuid) {
+          q = q.eq('class_id', filters.classId);
+        } else {
+          const { data: cls } = await supabase.from('classes').select('id').ilike('name', filters.classId).maybeSingle();
+          if (cls?.id) {
+            q = q.eq('class_id', cls.id);
+          }
+        }
+      }
       if (filters?.subjectId) q = q.eq('subject_id', filters.subjectId);
       if (filters?.status) q = q.eq('status', filters.status);
 
@@ -560,7 +646,10 @@ export async function getAdminResults(filters?: { termId?: string; classId?: str
 
   let list = [...mockResults];
   if (filters?.termId) list = list.filter(r => r.term_id === filters.termId);
-  if (filters?.classId) list = list.filter(r => r.class_id === filters.classId);
+  if (filters?.classId) {
+    const cLower = filters.classId.toLowerCase();
+    list = list.filter(r => r.class_id === filters.classId || r.class?.id === filters.classId || r.class?.name.toLowerCase() === cLower);
+  }
   if (filters?.subjectId) list = list.filter(r => r.subject_id === filters.subjectId);
   if (filters?.status) list = list.filter(r => r.status === filters.status);
   return list;
@@ -809,6 +898,39 @@ export async function getAdminAuditLogs() {
 }
 
 export async function getAdminStaff(): Promise<StaffRecord[]> {
+  let dynamicTeachers: StaffRecord[] = [];
+  try {
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const regCookie = cookieStore.get('registered_teachers_registry');
+    if (regCookie?.value) {
+      const list = JSON.parse(regCookie.value);
+      dynamicTeachers = list.map((t: any) => ({
+        id: t.id,
+        email: t.email,
+        display_name: t.display_name,
+        role: 'teacher' as const,
+        department: t.department || `Class Teacher (${t.assigned_class || 'Class'})`,
+        assigned_subject: t.assigned_subject || 'General Curriculum',
+        assigned_class: t.assigned_class || 'All Classes',
+        created_at: t.created_at || new Date().toISOString(),
+        status: 'active' as const,
+      }));
+    }
+  } catch {
+    // Cookie store context not available
+  }
+
+  const mergedMock = [...mockStaff];
+  for (const dt of dynamicTeachers) {
+    const idx = mergedMock.findIndex(s => s.email.toLowerCase() === dt.email.toLowerCase());
+    if (idx >= 0) {
+      mergedMock[idx] = dt;
+    } else {
+      mergedMock.push(dt);
+    }
+  }
+
   if (isSupabaseConfigured()) {
     try {
       const supabase = await createClient();
@@ -820,7 +942,7 @@ export async function getAdminStaff(): Promise<StaffRecord[]> {
 
       if (!error && data && data.length > 0) {
         return data.map((p) => {
-          const existingMock = mockStaff.find(m => m.id === p.id || m.email?.toLowerCase() === p.email?.toLowerCase());
+          const existingMock = mergedMock.find(m => m.id === p.id || m.email?.toLowerCase() === p.email?.toLowerCase());
           return {
             id: p.id,
             email: p.email || (existingMock?.email || ''),
@@ -839,7 +961,7 @@ export async function getAdminStaff(): Promise<StaffRecord[]> {
     }
   }
 
-  return [...mockStaff];
+  return mergedMock;
 }
 
 export async function addAdminTeacher(data: {

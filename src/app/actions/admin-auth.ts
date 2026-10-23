@@ -23,6 +23,8 @@ export interface StaffAuthContext {
   display_name: string;
   role: 'administrator' | 'teacher';
   department?: string;
+  assigned_class?: string;
+  assigned_subject?: string;
 }
 
 export type AdminAuthContext = StaffAuthContext;
@@ -123,7 +125,7 @@ export async function loginAdmin(
       };
     }
 
-    // Fallback Teacher 1: David Adeleke
+    // Fallback Teacher 1: David Adeleke (Form Teacher - JSS 1A)
     if (
       (email === 'david.adeleke@greenfieldcollege.edu' || email === 'teacher') &&
       parsed.data.password === 'Teacher@2026'
@@ -136,7 +138,8 @@ export async function loginAdmin(
           email: 'david.adeleke@greenfieldcollege.edu',
           display_name: 'Mr. David Adeleke',
           role: 'teacher',
-          department: 'Mathematics & Sciences',
+          department: 'Junior Secondary (Form Teacher)',
+          assigned_class: 'JSS 1A',
         }),
         {
           httpOnly: true,
@@ -148,12 +151,12 @@ export async function loginAdmin(
 
       return {
         success: true,
-        message: 'Teacher credentials verified. Entering Staff Portal...',
+        message: 'Class Teacher credentials verified (JSS 1A). Entering Staff Portal...',
         redirectUrl: '/admin',
       };
     }
 
-    // Fallback Teacher 2: Grace Danjuma
+    // Fallback Teacher 2: Grace Danjuma (Form Teacher - JSS 2A)
     if (
       email === 'grace.danjuma@greenfieldcollege.edu' &&
       parsed.data.password === 'Teacher@2026'
@@ -166,7 +169,8 @@ export async function loginAdmin(
           email: 'grace.danjuma@greenfieldcollege.edu',
           display_name: 'Mrs. Grace Danjuma',
           role: 'teacher',
-          department: 'Languages & Humanities',
+          department: 'Junior Secondary (Form Teacher)',
+          assigned_class: 'JSS 2A',
         }),
         {
           httpOnly: true,
@@ -178,12 +182,12 @@ export async function loginAdmin(
 
       return {
         success: true,
-        message: 'Teacher credentials verified. Entering Staff Portal...',
+        message: 'Class Teacher credentials verified (JSS 2A). Entering Staff Portal...',
         redirectUrl: '/admin',
       };
     }
 
-    // Fallback Teacher 3: Samuel Osei
+    // Fallback Teacher 3: Samuel Osei (Form Teacher - SS 1 Science)
     if (
       email === 'samuel.osei@greenfieldcollege.edu' &&
       parsed.data.password === 'Teacher@2026'
@@ -196,7 +200,8 @@ export async function loginAdmin(
           email: 'samuel.osei@greenfieldcollege.edu',
           display_name: 'Mr. Samuel Osei',
           role: 'teacher',
-          department: 'Basic Sciences & Computing',
+          department: 'Senior Secondary (Form Teacher)',
+          assigned_class: 'SS 1 Science',
         }),
         {
           httpOnly: true,
@@ -208,7 +213,7 @@ export async function loginAdmin(
 
       return {
         success: true,
-        message: 'Teacher credentials verified. Entering Staff Portal...',
+        message: 'Class Teacher credentials verified (SS 1 Science). Entering Staff Portal...',
         redirectUrl: '/admin',
       };
     }
@@ -222,6 +227,7 @@ export async function loginAdmin(
       display_name: string;
       role: 'teacher';
       department?: string;
+      assigned_class?: string;
       password?: string;
     }> = [];
     if (registeredCookie?.value) {
@@ -245,7 +251,8 @@ export async function loginAdmin(
           email: matchedTeacher.email,
           display_name: matchedTeacher.display_name,
           role: 'teacher',
-          department: matchedTeacher.department,
+          department: matchedTeacher.department || `Class Teacher (${matchedTeacher.assigned_class || 'Class'})`,
+          assigned_class: matchedTeacher.assigned_class || 'JSS 1A',
         }),
         {
           httpOnly: true,
@@ -257,7 +264,7 @@ export async function loginAdmin(
 
       return {
         success: true,
-        message: `Welcome, ${matchedTeacher.display_name}! Entering Staff Dashboard...`,
+        message: `Welcome, ${matchedTeacher.display_name}! Entering Class Teacher Dashboard (${matchedTeacher.assigned_class})...`,
         redirectUrl: '/admin',
       };
     }
@@ -278,9 +285,9 @@ export async function loginAdmin(
 const teacherRegisterSchema = z.object({
   full_name: z.string().min(3, 'Full name must be at least 3 characters long'),
   email: z.string().email('Please enter a valid official staff email'),
-  department: z.string().min(2, 'Please select or enter your academic department'),
+  department: z.string().optional(),
   assigned_subject: z.string().optional(),
-  assigned_class: z.string().optional(),
+  assigned_class: z.string().min(1, 'Please select the assigned class for this class teacher'),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
   confirm_password: z.string().min(6, 'Please confirm your password'),
   from_admin: z.string().optional(),
@@ -297,12 +304,21 @@ export async function registerTeacherAction(
   prevState: TeacherRegisterResult | null,
   formData: FormData
 ): Promise<TeacherRegisterResult> {
+  // Authorization check: Only logged-in administrators can create teacher accounts
+  const currentAdmin = await getAuthenticatedStaff();
+  if (currentAdmin?.role !== 'administrator') {
+    return {
+      success: false,
+      message: 'Access Restricted: Only School Administrators can onboard Class Teachers inside the Admin Portal.',
+    };
+  }
+
   const raw = {
     full_name: formData.get('full_name') as string,
     email: formData.get('email') as string,
-    department: formData.get('department') as string,
+    department: (formData.get('department') as string) || undefined,
     assigned_subject: (formData.get('assigned_subject') as string) || undefined,
-    assigned_class: (formData.get('assigned_class') as string) || undefined,
+    assigned_class: formData.get('assigned_class') as string,
     password: formData.get('password') as string,
     confirm_password: formData.get('confirm_password') as string,
     from_admin: (formData.get('from_admin') as string) || undefined,
@@ -337,7 +353,9 @@ export async function registerTeacherAction(
     };
   }
 
-  const { full_name, email, department, assigned_subject, assigned_class, password, from_admin } = parsed.data;
+  const { full_name, email, assigned_class, password } = parsed.data;
+  const department = parsed.data.department || `Class Teacher (${assigned_class})`;
+  const assigned_subject = parsed.data.assigned_subject || 'General Curriculum';
 
   try {
     const newId = `t-${Date.now()}`;
@@ -355,6 +373,8 @@ export async function registerTeacherAction(
             display_name: full_name,
             role: 'teacher',
             department,
+            assigned_class,
+            assigned_subject,
           },
         },
       });
@@ -384,7 +404,7 @@ export async function registerTeacherAction(
       assigned_class,
     });
 
-    // 3. Persist to registered_teachers_registry cookie so they can log in anytime
+    // 3. Persist to registered_teachers_registry cookie so the teacher can log in anytime
     const existingCookie = cookieStore.get('registered_teachers_registry');
     let registeredList: any[] = [];
     if (existingCookie?.value) {
@@ -403,7 +423,7 @@ export async function registerTeacherAction(
       department,
       assigned_subject,
       assigned_class,
-      password, // stored in httpOnly session registry for demo/local persistence
+      password, // stored in httpOnly session registry for local persistence
       created_at: new Date().toISOString(),
     });
 
@@ -414,37 +434,10 @@ export async function registerTeacherAction(
       path: '/',
     });
 
-    // If registered from inside the admin dashboard by an administrator, don't overwrite the admin's session
-    if (from_admin === 'true') {
-      return {
-        success: true,
-        message: `Teacher ${full_name} (${email}) has been successfully registered. They can now log into their Staff Dashboard.`,
-        redirectUrl: '/admin/staff',
-      };
-    }
-
-    // Otherwise, this is a teacher registering their own account. Log them in directly to their new dashboard!
-    cookieStore.set(
-      'demo_staff_session',
-      JSON.stringify({
-        id: supabaseUserId,
-        email,
-        display_name: full_name,
-        role: 'teacher',
-        department,
-      }),
-      {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24, // 24 hours
-        path: '/',
-      }
-    );
-
     return {
       success: true,
-      message: `Registration successful! Welcome to Greenfield College, ${full_name}. Entering your Staff Dashboard...`,
-      redirectUrl: '/admin',
+      message: `Class Teacher ${full_name} (${email}) has been assigned to ${assigned_class}. Their account is activated.`,
+      redirectUrl: '/admin/staff',
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Registration failed';
@@ -509,6 +502,8 @@ export async function getAuthenticatedStaff(): Promise<StaffAuthContext | null> 
           email: user.email || '',
           display_name: profile.display_name,
           role: profile.role,
+          assigned_class: user.user_metadata?.assigned_class,
+          department: user.user_metadata?.department,
         };
       }
     }

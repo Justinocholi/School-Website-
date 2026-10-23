@@ -23,6 +23,9 @@ export default async function BulkResultImportPage() {
     getAuthenticatedStaff(),
   ]);
 
+  const isAdmin = staff?.role === 'administrator';
+  const assignedClass = !isAdmin ? staff?.assigned_class : undefined;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Link
@@ -35,10 +38,12 @@ export default async function BulkResultImportPage() {
       <div>
         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
           <FileSpreadsheet className="w-6 h-6 text-emerald-800" />
-          Bulk Academic Marks Ingestion
+          Bulk Academic Marks Ingestion {assignedClass ? `(${assignedClass})` : ''}
         </h1>
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
-          Import assessment scores from Excel or CSV files with automated scoring, maximum marks validation, and draft/review controls.
+          {assignedClass
+            ? `Upload continuous assessment and examination spreadsheets directly for your assigned class arm (${assignedClass}).`
+            : 'Import assessment scores from Excel or CSV files with automated scoring, maximum marks validation, and draft/review controls.'}
         </p>
       </div>
 
@@ -47,6 +52,7 @@ export default async function BulkResultImportPage() {
         subjects={subjects}
         terms={terms}
         userRole={staff?.role || 'administrator'}
+        assignedClass={assignedClass}
       />
     </div>
   );

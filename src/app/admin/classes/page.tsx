@@ -49,24 +49,32 @@ export default async function AdminClassesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
-                  {classes.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-50">
-                      <td className="py-3.5 px-4 font-bold text-gray-900">
-                        {c.name}
-                      </td>
-                      <td className="py-3.5 px-4 text-gray-600">
-                        {c.level}
-                      </td>
-                      <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-800">
-                        {c.student_count || 0} Scholars
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <Badge variant="success" className="text-[10px]">
-                          {c.status.toUpperCase()}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
+                  {classes.map((c) => {
+                    const isMyClass = !isAdmin && staff?.assigned_class?.toLowerCase() === c.name.toLowerCase();
+                    return (
+                      <tr key={c.id} className={isMyClass ? "bg-emerald-50/70 border-l-4 border-emerald-600 font-medium" : "hover:bg-slate-50 font-medium"}>
+                        <td className="py-3.5 px-4 font-bold text-gray-900">
+                          <div className="flex items-center gap-2">
+                            <span>{c.name}</span>
+                            {isMyClass && (
+                              <Badge variant="info" className="text-[10px]">Your Form Class</Badge>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-gray-600">
+                          {c.level}
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-800">
+                          {c.student_count || 0} Scholars
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <Badge variant="success" className="text-[10px]">
+                            {c.status.toUpperCase()}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

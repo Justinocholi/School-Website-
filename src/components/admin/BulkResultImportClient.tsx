@@ -31,6 +31,7 @@ interface BulkResultImportClientProps {
   subjects: SubjectRecord[];
   terms: TermRecord[];
   userRole?: 'administrator' | 'teacher';
+  assignedClass?: string;
 }
 
 export function BulkResultImportClient({
@@ -38,8 +39,14 @@ export function BulkResultImportClient({
   subjects,
   terms,
   userRole = 'administrator',
+  assignedClass,
 }: BulkResultImportClientProps) {
-  const [selectedClass, setSelectedClass] = useState<string>(classes[0]?.id || '');
+  const isTeacher = userRole === 'teacher';
+  const teacherClass = assignedClass
+    ? classes.find((c) => c.name.toLowerCase() === assignedClass.toLowerCase()) || classes[0]
+    : undefined;
+
+  const [selectedClass, setSelectedClass] = useState<string>(teacherClass?.id || classes[0]?.id || '');
   const [selectedSubject, setSelectedSubject] = useState<string>(subjects[0]?.id || '');
   const [selectedTerm, setSelectedTerm] = useState<string>(terms[0]?.id || '');
 
@@ -117,17 +124,24 @@ export function BulkResultImportClient({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="space-y-1">
               <label className="font-semibold text-gray-700">Class</label>
-              <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="w-full h-9 rounded-lg border border-gray-300 bg-white px-2.5 text-xs text-gray-900 font-medium"
-              >
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              {isTeacher && assignedClass && teacherClass ? (
+                <div className="flex h-9 w-full items-center justify-between rounded-lg border border-gray-300 bg-slate-100 px-2.5 text-xs font-bold text-gray-700">
+                  <span>{assignedClass}</span>
+                  <Badge variant="outline" className="text-[10px]">Form Class Locked</Badge>
+                </div>
+              ) : (
+                <select
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-gray-300 bg-white px-2.5 text-xs text-gray-900 font-medium"
+                >
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div className="space-y-1">

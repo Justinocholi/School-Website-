@@ -26,6 +26,9 @@ export default async function ManualResultEntryPage() {
     getAuthenticatedStaff(),
   ]);
 
+  const isAdmin = staff?.role === 'administrator';
+  const assignedClass = !isAdmin ? staff?.assigned_class : undefined;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Link
@@ -42,7 +45,9 @@ export default async function ManualResultEntryPage() {
             Manual Score Recording
           </CardTitle>
           <p className="text-xs text-gray-500 mt-1">
-            Calculate continuous assessments and examination scores with real-time grade checks before saving.
+            {assignedClass
+              ? `Recording and compiling terminal continuous assessments and examination scores for ${assignedClass}.`
+              : 'Calculate continuous assessments and examination scores with real-time grade checks before saving.'}
           </p>
         </CardHeader>
         <CardContent className="p-6 sm:p-8">
@@ -52,6 +57,7 @@ export default async function ManualResultEntryPage() {
             subjects={subjects}
             terms={terms}
             userRole={staff?.role || 'administrator'}
+            assignedClass={assignedClass}
           />
         </CardContent>
       </Card>

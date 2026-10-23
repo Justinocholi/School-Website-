@@ -16,6 +16,7 @@ interface ManualResultEntryFormProps {
   subjects: SubjectRecord[];
   terms: TermRecord[];
   userRole?: 'administrator' | 'teacher';
+  assignedClass?: string;
 }
 
 export function ManualResultEntryForm({
@@ -24,6 +25,7 @@ export function ManualResultEntryForm({
   subjects,
   terms,
   userRole = 'administrator',
+  assignedClass,
 }: ManualResultEntryFormProps) {
   const isTeacher = userRole === 'teacher';
   const [state, formAction, isPending] = useActionState(saveSingleResultAction, null);
@@ -31,11 +33,30 @@ export function ManualResultEntryForm({
   const [caScore, setCaScore] = useState<number>(25);
   const [examScore, setExamScore] = useState<number>(60);
 
+  // If teacher has assigned class, filter students strictly to their class
+  const teacherClassObj = assignedClass
+    ? classes.find((c) => c.name.toLowerCase() === assignedClass.toLowerCase()) || classes[0]
+    : undefined;
+
+  const scopedStudents = assignedClass
+    ? students.filter((s) => s.class?.name.toLowerCase() === assignedClass.toLowerCase() || s.class_id === teacherClassObj?.id)
+    : students;
+
   const total = calculateTotalScore([caScore, examScore]);
   const gradeEval = evaluateGrade(total);
 
   return (
     <form action={formAction} className="space-y-6">
+      {assignedClass && isTeacher && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between text-xs text-emerald-950">
+          <div className="flex items-center gap-2">
+            <span className="font-bold">Form Teacher Scope:</span>
+            <span>Recording marks solely for students in <strong className="text-emerald-900">{assignedClass}</strong>.</span>
+          </div>
+          <Badge variant="info" className="text-[10px]">Class Locked</Badge>
+        </div>
+      )}
+
       {state && (
         <Alert
           variant={state.success ? 'success' : 'destructive'}
@@ -49,19 +70,23 @@ export function ManualResultEntryForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-gray-700">
-            Student <span className="text-rose-500">*</span>
+            Student {assignedClass ? `(${assignedClass})` : ''} <span className="text-rose-500">*</span>
           </label>
           <select
             name="student_id"
             required
-            defaultValue={students[0]?.student_id || ''}
+            defaultValue={scopedStudents[0]?.student_id || ''}
             className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-medium"
           >
-            {students.map((s) => (
-              <option key={s.id} value={s.student_id}>
-                {s.student_id} - {s.first_name} {s.last_name} ({s.class?.name || 'Class'})
-              </option>
-            ))}
+            {scopedStudents.length === 0 ? (
+              <option value="">No scholars enrolled in {assignedClass || 'this class'}</option>
+            ) : (
+              scopedStudents.map((s) => (
+                <option key={s.id} value={s.student_id}>
+                  {s.student_id} - {s.first_name} {s.last_name} ({s.class?.name || assignedClass || 'Class'})
+                </option>
+              ))
+            )}
           </select>
         </div>
 
@@ -89,18 +114,28 @@ export function ManualResultEntryForm({
           <label className="block text-xs font-semibold text-gray-700">
             Class Allocated <span className="text-rose-500">*</span>
           </label>
-          <select
-            name="class_id"
-            required
-            defaultValue={classes[0]?.id || ''}
-            className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-medium"
-          >
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          {isTeacher && assignedClass && teacherClassObj ? (
+            <div>
+              <input type="hidden" name="class_id" value={teacherClassObj.id} />
+              <div className="flex h-10 w-full items-center justify-between rounded-lg border border-gray-300 bg-slate-100 px-3 py-2 text-xs font-bold text-gray-700">
+                <span>{assignedClass} ({teacherClassObj.level})</span>
+                <Badge variant="outline" className="text-[10px]">Your Form Class</Badge>
+              </div>
+            </div>
+          ) : (
+            <select
+              name="class_id"
+              required
+              defaultValue={classes[0]?.id || ''}
+              className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-medium"
+            >
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="space-y-1.5">

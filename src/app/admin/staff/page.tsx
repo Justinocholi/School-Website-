@@ -53,20 +53,11 @@ export default async function AdminStaffPage() {
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
             <UserCheck className="w-6 h-6 text-emerald-800" />
-            Academic Staff & Teacher Roster
+            Class & Form Teachers Roster
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Directory of registered subject teachers, academic departments, and portal access credentials.
+            Directory of assigned form teachers and portal accounts. Each form teacher handles and compiles results solely for their designated class arm.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link href="/staff-register">
-            <Button size="sm" className="gap-1.5 text-xs bg-emerald-800 hover:bg-emerald-900 text-white font-semibold shadow-xs">
-              <PlusCircle className="w-3.5 h-3.5 text-amber-400" />
-              Register New Teacher
-            </Button>
-          </Link>
         </div>
       </div>
 
@@ -133,9 +124,9 @@ export default async function AdminStaffPage() {
                 <thead className="bg-slate-50 text-gray-600 uppercase border-b border-gray-200">
                   <tr>
                     <th className="py-3 px-4 font-semibold">Faculty Member</th>
+                    <th className="py-3 px-4 font-semibold">Designated Form Class</th>
                     <th className="py-3 px-4 font-semibold">Department</th>
-                    <th className="py-3 px-4 font-semibold">Allocations</th>
-                    <th className="py-3 px-4 text-center font-semibold">Role</th>
+                    <th className="py-3 px-4 text-center font-semibold">Portal Role</th>
                     <th className="py-3 px-4 text-center font-semibold">Status</th>
                   </tr>
                 </thead>
@@ -167,25 +158,20 @@ export default async function AdminStaffPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 text-gray-700">
-                          {member.department || 'Academic Faculty'}
+                        <td className="py-3.5 px-4">
+                          <span className="inline-flex items-center gap-1 font-mono font-bold text-emerald-800 text-xs px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200">
+                            {member.role === 'administrator' ? 'All Classes (School-wide)' : `Form Teacher • ${member.assigned_class || 'Class'}`}
+                          </span>
                         </td>
-                        <td className="py-3.5 px-4 text-gray-600">
-                          <div className="space-y-0.5 text-[11px]">
-                            <span className="block font-medium text-gray-800">
-                              {member.assigned_subject || 'General Curriculum'}
-                            </span>
-                            <span className="block text-gray-500">
-                              {member.assigned_class || 'All Classes'}
-                            </span>
-                          </div>
+                        <td className="py-3.5 px-4 text-gray-700">
+                          {member.department || (member.role === 'administrator' ? 'Governance' : 'Academic Faculty')}
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <Badge
                             variant={member.role === 'administrator' ? 'default' : 'info'}
                             className="text-[10px]"
                           >
-                            {member.role === 'administrator' ? 'Administrator' : 'Teacher'}
+                            {member.role === 'administrator' ? 'Administrator' : 'Class Teacher'}
                           </Badge>
                         </td>
                         <td className="py-3.5 px-4 text-center">
@@ -207,10 +193,10 @@ export default async function AdminStaffPage() {
           <div className="space-y-3">
             <div className="flex items-center gap-1.5 px-1">
               <PlusCircle className="w-4 h-4 text-emerald-800" />
-              <h3 className="text-sm font-bold text-gray-800">Onboard New Faculty Member</h3>
+              <h3 className="text-sm font-bold text-gray-800">Onboard Form Teacher</h3>
             </div>
             <p className="text-xs text-gray-500 px-1">
-              Add a new teacher directly from the administrative portal. Their login account will be activated immediately.
+              Create an account for a class teacher to compile, upload, and manage terminal results specifically for their designated class arm.
             </p>
             <TeacherRegisterForm classes={classes} subjects={subjects} fromAdmin={true} />
           </div>

@@ -59,20 +59,6 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Teacher Registration Callout */}
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-emerald-950 shadow-xs">
-          <div>
-            <span className="font-bold text-xs block text-emerald-900">New Academic Staff Member?</span>
-            <span className="text-[11px] text-emerald-700">Register your faculty account to access your personal marking dashboard.</span>
-          </div>
-          <Link href="/staff-register" className="shrink-0 w-full sm:w-auto">
-            <Button size="sm" className="w-full bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold gap-1.5 shadow-xs">
-              <UserCheck className="w-3.5 h-3.5 text-amber-400" />
-              <span>Register as Teacher &rarr;</span>
-            </Button>
-          </Link>
-        </div>
-
         {/* Multi-Account Role Credentials Helper */}
         <div className="bg-slate-900 text-white border border-slate-800 rounded-2xl p-4 shadow-md space-y-3">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -94,8 +80,8 @@ export default function AdminLoginPage() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-bold text-white text-xs">Administrator</span>
-                <Badge variant="success" className="text-[9px] px-1.5 py-0">Full Access</Badge>
+                <span className="font-bold text-white text-xs">School Admin</span>
+                <Badge variant="success" className="text-[9px] px-1.5 py-0">Full Governance</Badge>
               </div>
               <p className="text-[11px] text-slate-400 mt-1 truncate">admin@greenfieldcollege.edu</p>
               <p className="text-[10px] text-emerald-400 font-mono mt-0.5">Password: Admin@2026</p>
@@ -113,9 +99,9 @@ export default function AdminLoginPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-bold text-white text-xs">Mr. David Adeleke</span>
-                <Badge variant="info" className="text-[9px] px-1.5 py-0">Maths Staff</Badge>
+                <Badge variant="info" className="text-[9px] px-1.5 py-0">JSS 1A</Badge>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1 truncate">david.adeleke@greenfieldcollege.edu</p>
+              <p className="text-[11px] text-slate-300 font-medium mt-1 truncate">Form Teacher &bull; JSS 1A</p>
               <p className="text-[10px] text-emerald-400 font-mono mt-0.5">Password: Teacher@2026</p>
             </button>
 
@@ -131,9 +117,9 @@ export default function AdminLoginPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-bold text-white text-xs">Mrs. Grace Danjuma</span>
-                <Badge variant="info" className="text-[9px] px-1.5 py-0">English Staff</Badge>
+                <Badge variant="info" className="text-[9px] px-1.5 py-0">JSS 2A</Badge>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1 truncate">grace.danjuma@greenfieldcollege.edu</p>
+              <p className="text-[11px] text-slate-300 font-medium mt-1 truncate">Form Teacher &bull; JSS 2A</p>
               <p className="text-[10px] text-emerald-400 font-mono mt-0.5">Password: Teacher@2026</p>
             </button>
 
@@ -149,9 +135,9 @@ export default function AdminLoginPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-bold text-white text-xs">Mr. Samuel Osei</span>
-                <Badge variant="info" className="text-[9px] px-1.5 py-0">Sciences Staff</Badge>
+                <Badge variant="info" className="text-[9px] px-1.5 py-0">SS 1 Science</Badge>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1 truncate">samuel.osei@greenfieldcollege.edu</p>
+              <p className="text-[11px] text-slate-300 font-medium mt-1 truncate">Form Teacher &bull; SS 1</p>
               <p className="text-[10px] text-emerald-400 font-mono mt-0.5">Password: Teacher@2026</p>
             </button>
           </div>

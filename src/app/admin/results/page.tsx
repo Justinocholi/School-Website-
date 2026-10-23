@@ -30,16 +30,20 @@ export default async function AdminResultsPage({
   searchParams: Promise<{ termId?: string; classId?: string; subjectId?: string; status?: string }>;
 }) {
   const { termId, classId, subjectId, status } = await searchParams;
+  const staff = await getAuthenticatedStaff();
+  const isAdmin = staff?.role === 'administrator';
 
-  const [results, classes, subjects, terms, staff] = await Promise.all([
-    getAdminResults({ termId, classId, subjectId, status }),
+  // If teacher, automatically restrict query to their assigned form class
+  const effectiveClassId = !isAdmin && staff?.assigned_class
+    ? staff.assigned_class
+    : classId;
+
+  const [results, classes, subjects, terms] = await Promise.all([
+    getAdminResults({ termId, classId: effectiveClassId, subjectId, status }),
     getAdminClasses(),
     getAdminSubjects(),
     getAdminTerms(),
-    getAuthenticatedStaff(),
   ]);
-
-  const isAdmin = staff?.role === 'administrator';
 
   return (
     <div className="space-y-6">
@@ -48,10 +52,12 @@ export default async function AdminResultsPage({
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
             <FileCheck2 className="w-6 h-6 text-emerald-800" />
-            Academic Results Management
+            {isAdmin ? 'Academic Results Management' : `Class Results — ${staff?.assigned_class || 'Form Class'}`}
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Browse, filter, audit, and approve terminal examination results across all classes.
+            {isAdmin
+              ? 'Browse, filter, audit, and approve terminal examination results across all classes.'
+              : `Review and audit continuous assessments and examination results compiled for ${staff?.assigned_class}.`}
           </p>
         </div>
 
@@ -101,16 +107,26 @@ export default async function AdminResultsPage({
 
             <div>
               <label className="block text-[11px] font-semibold text-gray-500 mb-1">Class</label>
-              <select
-                name="classId"
-                defaultValue={classId || ''}
-                className="w-full h-9 rounded-lg border border-gray-300 bg-white px-2.5 font-medium"
-              >
-                <option value="">All Classes</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              {!isAdmin && staff?.assigned_class ? (
+                <div>
+                  <input type="hidden" name="classId" value={effectiveClassId} />
+                  <div className="w-full h-9 rounded-lg border border-gray-300 bg-slate-100 px-2.5 font-bold flex items-center text-gray-700 justify-between">
+                    <span>{staff.assigned_class}</span>
+                    <Badge variant="outline" className="text-[9px]">Locked</Badge>
+                  </div>
+                </div>
+              ) : (
+                <select
+                  name="classId"
+                  defaultValue={classId || ''}
+                  className="w-full h-9 rounded-lg border border-gray-300 bg-white px-2.5 font-medium"
+                >
+                  <option value="">All Classes</option>
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>

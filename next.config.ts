@@ -9,18 +9,6 @@ const nextConfig: NextConfig = {
       },
     },
   },
-  async rewrites() {
-    return [
-      {
-        source: '/admin-register',
-        destination: '/staff-register',
-      },
-      {
-        source: '/admin/register',
-        destination: '/staff-register',
-      },
-    ];
-  },
 };
 
 export default nextConfig;

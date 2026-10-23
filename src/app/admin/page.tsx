@@ -27,12 +27,9 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminOverviewPage() {
-  const [stats, staff] = await Promise.all([
-    getAdminOverviewStats(),
-    getAuthenticatedStaff(),
-  ]);
-
+  const staff = await getAuthenticatedStaff();
   const isAdmin = staff?.role === 'administrator';
+  const stats = await getAdminOverviewStats(!isAdmin && staff?.assigned_class ? staff.assigned_class : undefined);
 
   return (
     <div className="space-y-8">
@@ -40,12 +37,12 @@ export default async function AdminOverviewPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            {isAdmin ? 'Administrator Overview' : 'Academic Staff Dashboard'}
+            {isAdmin ? 'Administrator Overview' : `Class Dashboard — ${staff?.assigned_class || 'Form Class'}`}
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
             {isAdmin
               ? 'Institutional governance, student records, examination results, and operations monitoring.'
-              : `Welcome, ${staff?.display_name || 'Academic Staff'}${staff?.department ? ` • ${staff.department}` : ''}. Manage student records, enter continuous assessments, and submit exam marks.`}
+              : `Welcome, ${staff?.display_name || 'Class Teacher'} • Form Teacher for ${staff?.assigned_class || 'your class'}. Manage student records, record continuous assessments, and compile exam marks.`}
           </p>
         </div>
 
@@ -79,7 +76,9 @@ export default async function AdminOverviewPage() {
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Active Students</p>
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                {isAdmin ? 'Active Students' : `Class Scholars`}
+              </p>
               <h3 className="text-2xl font-bold text-gray-900">{stats.totalStudents}</h3>
             </div>
           </CardContent>
@@ -91,8 +90,12 @@ export default async function AdminOverviewPage() {
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total Classes</p>
-              <h3 className="text-2xl font-bold text-gray-900">{stats.totalClasses}</h3>
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                {isAdmin ? 'Total Classes' : 'Assigned Class'}
+              </p>
+              <h3 className="text-2xl font-bold text-gray-900">
+                {isAdmin ? stats.totalClasses : (staff?.assigned_class || 'JSS 1A')}
+              </h3>
             </div>
           </CardContent>
         </Card>
@@ -115,7 +118,9 @@ export default async function AdminOverviewPage() {
               <Clock className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Awaiting Review</p>
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                {isAdmin ? 'Awaiting Review' : 'Pending Review'}
+              </p>
               <h3 className="text-2xl font-bold text-amber-700">{stats.pendingResults}</h3>
             </div>
           </CardContent>
@@ -127,7 +132,9 @@ export default async function AdminOverviewPage() {
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Published Results</p>
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                {isAdmin ? 'Published Results' : 'Published Marks'}
+              </p>
               <h3 className="text-2xl font-bold text-emerald-800">{stats.publishedResults}</h3>
             </div>
           </CardContent>

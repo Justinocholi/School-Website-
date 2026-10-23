@@ -39,15 +39,15 @@ export default async function AdminLayout({
 
   const navSections = [
     {
-      title: 'Management',
+      title: isAdmin ? 'Management' : `Class Management (${staff.assigned_class || 'Form Class'})`,
       items: [
         { name: 'Overview', href: '/admin', icon: LayoutDashboard },
         ...(isAdmin
           ? [{ name: 'Staff & Teachers', href: '/admin/staff', icon: UserCheck }]
           : []),
-        { name: 'Students', href: '/admin/students', icon: Users },
+        { name: isAdmin ? 'All Students' : `Students (${staff.assigned_class || 'Class'})`, href: '/admin/students', icon: Users },
         { name: 'Import Students', href: '/admin/students/import', icon: FileSpreadsheet },
-        { name: 'Classes', href: '/admin/classes', icon: Layers },
+        { name: isAdmin ? 'Classes' : `My Class (${staff.assigned_class || 'Class'})`, href: '/admin/classes', icon: Layers },
         { name: 'Subjects', href: '/admin/subjects', icon: BookOpen },
         ...(isAdmin
           ? [{ name: 'Sessions & Terms', href: '/admin/academic-sessions', icon: Calendar }]
@@ -57,7 +57,7 @@ export default async function AdminLayout({
     {
       title: 'Academic Results',
       items: [
-        { name: 'All Results', href: '/admin/results', icon: FileCheck2 },
+        { name: isAdmin ? 'All Results' : `Class Results (${staff.assigned_class || 'Class'})`, href: '/admin/results', icon: FileCheck2 },
         { name: 'Manual Entry', href: '/admin/results/entry', icon: PenTool },
         { name: 'Import Results', href: '/admin/results/import', icon: FileSpreadsheet },
         ...(isAdmin
@@ -100,10 +100,10 @@ export default async function AdminLayout({
           </div>
           <div>
             <span className="font-bold text-white text-base leading-none block">
-              Staff Dashboard
+              {isAdmin ? 'Admin Portal' : 'Class Portal'}
             </span>
             <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
-              {isAdmin ? 'School Administrator' : 'Academic Staff'}
+              {isAdmin ? 'School Administrator' : `Form Teacher • ${staff.assigned_class || 'Class'}`}
             </span>
           </div>
         </div>
@@ -159,7 +159,7 @@ export default async function AdminLayout({
             <span className="text-xs font-semibold text-gray-500">Academic Session:</span>
             <Badge variant="success">2026/2027 (Active Term)</Badge>
             <Badge variant={isAdmin ? 'default' : 'info'} className="text-[11px] hidden sm:inline-flex">
-              {isAdmin ? 'Full Admin Access' : 'Teacher Access'}
+              {isAdmin ? 'Full Admin Access' : `Form Teacher (${staff.assigned_class || 'Class'})`}
             </Badge>
           </div>
 
