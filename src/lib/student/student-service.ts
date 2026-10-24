@@ -1,13 +1,18 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { cookies } from 'next/headers';
 import {
-  StudentRecord,
   ResultRecord,
   AcademicSession,
   TermRecord,
-  Announcement,
 } from '@/types/database.types';
 import { calculateTermPerformance } from '@/lib/grading/grading-engine';
+import {
+  getAdminResults,
+  getAdminTerms,
+  getAdminSessions,
+  getAdminStudentById,
+} from '@/lib/admin/admin-service';
 
 export interface StudentAuthContext {
   id: string;
@@ -23,88 +28,88 @@ export interface StudentAuthContext {
   email?: string;
 }
 
-function isSupabaseConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  return !url.includes('placeholder') && !key.includes('placeholder') && url.startsWith('http');
+function mapStudentRowToContext(student: any): StudentAuthContext {
+  const classObj = student.class as { id: string; name: string } | null;
+  const studentCode = String(student.student_id || '').toUpperCase();
+  return {
+    id: student.id,
+    student_id: studentCode,
+    first_name: student.first_name,
+    last_name: student.last_name,
+    full_name: `${student.first_name} ${student.last_name}`.trim(),
+    class_name: classObj?.name || 'Unassigned',
+    class_id: student.class_id || classObj?.id || undefined,
+    admission_date: student.admission_date || undefined,
+    status: student.status || 'active',
+    user_id: student.user_id || undefined,
+    email: `${studentCode.toLowerCase()}@student.greenfieldcollege.edu`,
+  };
 }
 
 /**
- * Returns the currently authenticated student session.
- * Enforces server-side authentication check.
+ * Returns the currently authenticated student from Supabase.
+ * Always resolves live student data from public.students in Supabase.
  */
 export async function getAuthenticatedStudent(): Promise<StudentAuthContext | null> {
-  // 1. Check Supabase Auth if configured
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+  const supabaseAdmin = createAdminClient();
 
-      if (user) {
-        const { data: student } = await supabase
-          .from('students')
-          .select('id, student_id, first_name, last_name, other_names, admission_date, status, class:classes(id, name)')
-          .eq('user_id', user.id)
-          .single();
-
-        if (student) {
-          const classObj = student.class as unknown as { id: string; name: string } | null;
-          return {
-            id: student.id,
-            student_id: student.student_id,
-            first_name: student.first_name,
-            last_name: student.last_name,
-            full_name: `${student.first_name} ${student.last_name}`,
-            class_name: classObj?.name || 'Unassigned',
-            class_id: classObj?.id,
-            admission_date: student.admission_date,
-            status: student.status,
-            user_id: user.id,
-            email: user.email,
-          };
-        }
-      }
-    } catch {
-      // Supabase query error fallback
-    }
-  }
-
-  // 2. Check demo cookie session
+  // 1. Check active student session cookie first (set on student login)
   try {
     const cookieStore = await cookies();
-    const demoCookie = cookieStore.get('demo_student_session');
-    if (demoCookie?.value) {
-      const parsed = JSON.parse(demoCookie.value);
-      if (parsed.student_id) {
-        // Cross-reference with persistent store
-        const { findStoreStudent } = await import('@/lib/storage/store');
-        const stored = findStoreStudent(parsed.student_id);
-
-        const firstName = parsed.first_name || stored?.first_name || parsed.name?.split(' ')[0] || 'Student';
-        const lastName = parsed.last_name || stored?.last_name || parsed.name?.split(' ').slice(1).join(' ') || '';
-        const fullName = parsed.full_name || (stored ? `${stored.first_name} ${stored.last_name}` : parsed.name) || `${firstName} ${lastName}`.trim();
-        const className = parsed.class_name || stored?.class?.name || 'JSS 1A';
-        const classId = parsed.class_id || stored?.class_id || '77777777-7777-7777-7777-777777777771';
-        const admissionDate = parsed.admission_date || stored?.admission_date || '2026-09-01';
-        const studentId = parsed.student_id.toUpperCase();
-        const id = stored?.id || parsed.id || studentId;
-
-        return {
-          id,
-          student_id: studentId,
-          first_name: firstName,
-          last_name: lastName,
-          full_name: fullName,
-          class_name: className,
-          class_id: classId,
-          admission_date: admissionDate,
-          status: parsed.status || stored?.status || 'active',
-          email: `${studentId.toLowerCase()}@student.greenfieldcollege.edu`,
-        };
+    const uidCookie = cookieStore.get('student_portal_uid');
+    if (uidCookie?.value) {
+      const student = await getAdminStudentById(uidCookie.value);
+      if (student && student.status === 'active') {
+        return mapStudentRowToContext(student);
       }
     }
   } catch {
-    // Cookie read failed
+    // Continue to Supabase Auth check
+  }
+
+  // 2. Check Supabase Auth session
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      // Find by user_id first
+      const { data: studentByUser } = await supabaseAdmin
+        .from('students')
+        .select(
+          'id, user_id, student_id, first_name, last_name, other_names, class_id, admission_date, status, class:classes(id, name, level)'
+        )
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (studentByUser && studentByUser.status === 'active') {
+        return mapStudentRowToContext(studentByUser);
+      }
+
+      // Fallback: match by user_metadata.student_id or student email prefix
+      const metaStudentId =
+        user.user_metadata?.student_id ||
+        (user.email?.endsWith('@student.greenfieldcollege.edu')
+          ? user.email.split('@')[0].toUpperCase()
+          : null);
+
+      if (metaStudentId) {
+        const studentByCode = await getAdminStudentById(String(metaStudentId));
+        if (studentByCode && studentByCode.status === 'active') {
+          if (!studentByCode.user_id) {
+            await supabaseAdmin
+              .from('students')
+              .update({ user_id: user.id })
+              .eq('id', studentByCode.id);
+          }
+          return mapStudentRowToContext(studentByCode);
+        }
+      }
+    }
+  } catch {
+    // Unauthenticated
   }
 
   return null;
@@ -114,61 +119,97 @@ export async function getAuthenticatedStudent(): Promise<StudentAuthContext | nu
  * Retrieves student dashboard summary: published results, academic session, announcements.
  */
 export async function getStudentDashboardData(studentIdOrDbId: string) {
-  const { getAdminResults } = await import('@/lib/admin/admin-service');
-  const allResults = await getAdminResults({ status: 'published' });
+  const supabaseAdmin = createAdminClient();
 
-  const normId = studentIdOrDbId.toUpperCase();
-  const studentResults = allResults.filter(r =>
-    r.student_id === studentIdOrDbId ||
-    r.student?.id === studentIdOrDbId ||
-    r.student?.student_id.toUpperCase() === normId
-  );
+  const [studentResults, { data: dbAnnouncements }] = await Promise.all([
+    getAdminResults({
+      status: 'published',
+      studentId: studentIdOrDbId,
+    }),
+    supabaseAdmin
+      .from('announcements')
+      .select('id, title, summary, published_at')
+      .eq('status', 'published')
+      .in('target_audience', ['all', 'students'])
+      .order('published_at', { ascending: false })
+      .limit(5),
+  ]);
+
+  const announcements =
+    dbAnnouncements && dbAnnouncements.length > 0
+      ? dbAnnouncements.map((a) => ({
+          id: a.id,
+          title: a.title,
+          published_at: a.published_at || new Date().toISOString(),
+          summary: a.summary,
+        }))
+      : [
+          {
+            id: '1',
+            title: 'Academic Term Resumption & Assessment Policy',
+            published_at: '2026-09-07T08:00:00Z',
+            summary:
+              'All scholars are advised to inspect their terminal continuous assessments and examination scores.',
+          },
+          {
+            id: '2',
+            title: 'Science Fair & STEM Exhibition Submission Due',
+            published_at: '2026-10-01T08:00:00Z',
+            summary:
+              'Submit your project briefs to the STEM coordinator before Friday.',
+          },
+        ];
 
   return {
     resultsCount: studentResults.length,
-    announcements: [
-      {
-        id: '1',
-        title: 'Academic Term Resumption & Assessment Policy',
-        published_at: '2026-09-07T08:00:00Z',
-        summary: 'All scholars are advised to inspect their terminal continuous assessments and examination scores.',
-      },
-      {
-        id: '2',
-        title: 'Science Fair & STEM Exhibition Submission Due',
-        published_at: '2026-10-01T08:00:00Z',
-        summary: 'Submit your project briefs to the STEM coordinator before Friday.',
-      },
-    ],
-    recentResults: studentResults.slice(0, 5) as ResultRecord[],
+    announcements,
+    recentResults: studentResults.slice(0, 10) as ResultRecord[],
   };
 }
 
 /**
- * Securely retrieves published results for the student.
+ * Securely retrieves published results for the student from Supabase.
  * Guarantees that students cannot view drafts or results belonging to other students.
  */
-export async function getStudentPublishedResults(studentDbIdOrId: string, termId?: string): Promise<{
+export async function getStudentPublishedResults(
+  studentDbIdOrId: string,
+  termId?: string
+): Promise<{
   results: ResultRecord[];
   performance: ReturnType<typeof calculateTermPerformance>;
   terms: TermRecord[];
   sessions: AcademicSession[];
   selectedTermId: string;
 }> {
-  const { getAdminTerms, getAdminSessions, getAdminResults } = await import('@/lib/admin/admin-service');
-  const terms = await getAdminTerms();
-  const sessions = await getAdminSessions();
+  const [terms, sessions, allStudentPublished] = await Promise.all([
+    getAdminTerms(),
+    getAdminSessions(),
+    getAdminResults({
+      status: 'published',
+      studentId: studentDbIdOrId,
+    }),
+  ]);
 
   const activeTerm = terms.find((t: TermRecord) => t.is_active);
-  const currentTermId = termId || activeTerm?.id || terms[0]?.id || '33333333-3333-3333-3333-333333333331';
+  let currentTermId =
+    termId ||
+    activeTerm?.id ||
+    terms[0]?.id ||
+    '33333333-3333-3333-3333-333333333331';
 
-  const allPublished = await getAdminResults({ termId: currentTermId, status: 'published' });
-  const normId = studentDbIdOrId.toUpperCase();
+  // If no explicit termId filter was requested in the URL and the active term has 0 results
+  // for this student, but another term has published results, auto-select the term with results.
+  if (!termId && allStudentPublished.length > 0) {
+    const hasInCurrent = allStudentPublished.some(
+      (r) => r.term_id === currentTermId
+    );
+    if (!hasInCurrent) {
+      currentTermId = allStudentPublished[0].term_id;
+    }
+  }
 
-  const studentResults = allPublished.filter(r =>
-    r.student_id === studentDbIdOrId ||
-    r.student?.id === studentDbIdOrId ||
-    r.student?.student_id.toUpperCase() === normId
+  const studentResults = allStudentPublished.filter(
+    (r) => r.term_id === currentTermId
   );
 
   const performance = calculateTermPerformance(studentResults);
@@ -183,17 +224,60 @@ export async function getStudentPublishedResults(studentDbIdOrId: string, termId
 }
 
 /**
- * Access control boundary: strictly checks student ID matching.
+ * Access control boundary: strictly checks student ID matching against Supabase.
  */
-export async function getStudentSingleResult(studentDbIdOrId: string, resultId: string): Promise<ResultRecord | null> {
-  const { getAdminResults } = await import('@/lib/admin/admin-service');
-  const allResults = await getAdminResults({ status: 'published' });
-  const normId = studentDbIdOrId.toUpperCase();
+export async function getStudentSingleResult(
+  studentDbIdOrId: string,
+  resultId: string
+): Promise<ResultRecord | null> {
+  const UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_REGEX.test(resultId.trim())) {
+    return null;
+  }
 
-  const found = allResults.find(r =>
-    r.id === resultId &&
-    (r.student_id === studentDbIdOrId || r.student?.id === studentDbIdOrId || r.student?.student_id.toUpperCase() === normId)
-  );
+  const supabaseAdmin = createAdminClient();
+  const { data, error } = await supabaseAdmin
+    .from('results')
+    .select(
+      `
+      id, student_id, subject_id, class_id, term_id, status, total_score, grade, remarks, published_at, created_at, updated_at,
+      student:students(id, user_id, student_id, first_name, last_name, other_names, class_id, admission_date, status, created_at, updated_at),
+      subject:subjects(id, name, code, status, created_at),
+      class:classes(id, name, level, status, created_at),
+      term:terms(id, name, sequence_number, is_active, academic_session_id),
+      scores:result_scores(id, result_id, score, assessment_component_id, component:assessment_components(id, name, code, maximum_score, sequence_number, is_active))
+    `
+    )
+    .eq('id', resultId.trim())
+    .eq('status', 'published')
+    .maybeSingle();
 
-  return found || null;
+  if (error || !data) {
+    return null;
+  }
+
+  const sTrim = studentDbIdOrId.trim();
+  const sUpper = sTrim.toUpperCase();
+  const studentObj = (data as any).student;
+
+  const isOwner =
+    data.student_id === sTrim ||
+    studentObj?.id === sTrim ||
+    studentObj?.student_id?.toUpperCase() === sUpper;
+
+  if (!isOwner) {
+    return null;
+  }
+
+  return {
+    ...(data as unknown as ResultRecord),
+    total_score: Number(data.total_score ?? 0),
+    scores: Array.isArray((data as any).scores)
+      ? (data as any).scores.map((s: any) => ({
+          ...s,
+          score: Number(s.score ?? 0),
+        }))
+      : [],
+  };
 }

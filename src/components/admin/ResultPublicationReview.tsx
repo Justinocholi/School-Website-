@@ -1,19 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ResultRecord } from '@/types/database.types';
 import { publishResultsAction } from '@/app/actions/admin-results';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
-import { Send, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Send, CheckCircle2 } from 'lucide-react';
 
 export function ResultPublicationReview({
   pendingResults,
 }: {
   pendingResults: ResultRecord[];
 }) {
+  const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<string[]>(
     pendingResults.map((r) => r.id)
   );
@@ -21,7 +23,14 @@ export function ResultPublicationReview({
     'Final academic board approval and verification'
   );
   const [isPublishing, setIsPublishing] = useState(false);
-  const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    setSelectedIds(pendingResults.map((r) => r.id));
+  }, [pendingResults]);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === pendingResults.length) {
@@ -44,6 +53,9 @@ export function ResultPublicationReview({
     try {
       const res = await publishResultsAction(selectedIds, auditReason);
       setFeedback(res);
+      if (res.success) {
+        router.refresh();
+      }
     } catch (err: unknown) {
       setFeedback({
         success: false,
@@ -68,9 +80,12 @@ export function ResultPublicationReview({
       {pendingResults.length === 0 ? (
         <Card className="border-gray-200 p-8 text-center space-y-3">
           <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-          <h3 className="text-lg font-bold text-gray-900">No Pending Results Awaiting Approval</h3>
+          <h3 className="text-lg font-bold text-gray-900">
+            No Pending Results Awaiting Approval
+          </h3>
           <p className="text-xs text-gray-500 max-w-md mx-auto">
-            All submitted student scores have either been published to the student portal or no new draft results were imported.
+            All submitted student scores have either been published to the
+            student portal or no new draft results were imported.
           </p>
         </Card>
       ) : (
@@ -80,12 +95,16 @@ export function ResultPublicationReview({
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"
-                checked={selectedIds.length === pendingResults.length && pendingResults.length > 0}
+                checked={
+                  selectedIds.length === pendingResults.length &&
+                  pendingResults.length > 0
+                }
                 onChange={toggleSelectAll}
                 className="w-4 h-4 rounded text-emerald-800 focus:ring-emerald-700 cursor-pointer"
               />
               <span className="text-xs font-semibold text-gray-700">
-                {selectedIds.length} of {pendingResults.length} Selected for Publication
+                {selectedIds.length} of {pendingResults.length} Selected for
+                Publication
               </span>
             </div>
 
@@ -119,6 +138,7 @@ export function ResultPublicationReview({
                     <th className="py-2.5 px-3">Student ID</th>
                     <th className="py-2.5 px-3">Student Name</th>
                     <th className="py-2.5 px-3">Subject</th>
+                    <th className="py-2.5 px-3">Term</th>
                     <th className="py-2.5 px-3">Class</th>
                     <th className="py-2.5 px-3 text-center">Score</th>
                     <th className="py-2.5 px-3 text-center">Grade</th>
@@ -129,7 +149,12 @@ export function ResultPublicationReview({
                   {pendingResults.map((r) => {
                     const isChecked = selectedIds.includes(r.id);
                     return (
-                      <tr key={r.id} className={isChecked ? 'bg-emerald-50/40' : 'hover:bg-slate-50'}>
+                      <tr
+                        key={r.id}
+                        className={
+                          isChecked ? 'bg-emerald-50/40' : 'hover:bg-slate-50'
+                        }
+                      >
                         <td className="py-2.5 px-3">
                           <input
                             type="checkbox"
@@ -147,6 +172,9 @@ export function ResultPublicationReview({
                         <td className="py-2.5 px-3">
                           {r.subject?.name} ({r.subject?.code})
                         </td>
+                        <td className="py-2.5 px-3 text-gray-700">
+                          {r.term?.name || 'Active Term'}
+                        </td>
                         <td className="py-2.5 px-3 text-gray-600">
                           {r.class?.name}
                         </td>
@@ -154,12 +182,26 @@ export function ResultPublicationReview({
                           {r.total_score}
                         </td>
                         <td className="py-2.5 px-3 text-center">
-                          <Badge variant={r.grade === 'A' ? 'success' : r.grade === 'B' ? 'info' : 'warning'} className="text-[10px]">
+                          <Badge
+                            variant={
+                              r.grade === 'A'
+                                ? 'success'
+                                : r.grade === 'B'
+                                  ? 'info'
+                                  : 'warning'
+                            }
+                            className="text-[10px]"
+                          >
                             {r.grade}
                           </Badge>
                         </td>
                         <td className="py-2.5 px-3 text-center">
-                          <Badge variant={r.status === 'published' ? 'success' : 'warning'} className="text-[10px]">
+                          <Badge
+                            variant={
+                              r.status === 'published' ? 'success' : 'warning'
+                            }
+                            className="text-[10px]"
+                          >
                             {r.status.toUpperCase()}
                           </Badge>
                         </td>

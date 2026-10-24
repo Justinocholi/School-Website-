@@ -3,11 +3,14 @@
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAdminStudentById } from '@/lib/admin/admin-service';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 const loginSchema = z.object({
-  student_id: z.string().min(3, 'Please enter your unique Student ID (e.g. GFS001)'),
+  student_id: z
+    .string()
+    .min(3, 'Please enter your unique Student ID (e.g. GFS001)'),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
 });
 
@@ -43,93 +46,129 @@ export async function loginStudent(
   const internalEmail = `${studentId.toLowerCase()}@student.greenfieldcollege.edu`;
 
   try {
-    const supabase = await createClient();
-    
-    // Attempt standard Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: internalEmail,
-      password: password,
-    });
-
-    if (!authError && authData.user) {
-      // Check student profile & record
-      const { data: studentRecord } = await supabase
-        .from('students')
-        .select('id, student_id, status')
-        .eq('student_id', studentId)
-        .single();
-
-      if (studentRecord && studentRecord.status !== 'active') {
-        await supabase.auth.signOut();
-        return {
-          success: false,
-          message: 'Your student account is currently inactive. Please contact the school administrative office.',
-        };
-      }
-
+    // 1. Verify student exists in Supabase public.students
+    const studentRecord = await getAdminStudentById(studentId);
+    if (!studentRecord) {
       return {
-        success: true,
-        message: 'Sign in successful! Redirecting...',
-        redirectUrl: '/student',
+        success: false,
+        message:
+          'Invalid Student ID or password. Please verify your credentials or contact the school ICT desk.',
       };
     }
 
-    // Graceful offline/demo fallback when remote Supabase Auth has not yet been seeded:
-    // If student ID starts with GFS or is DEMO001 and password matches demo credential
-    if ((studentId.startsWith('GFS') || studentId === 'DEMO001') && password === 'Student@2026') {
-      // Look up student details dynamically from persistent store
-      const { findStoreStudent } = await import('@/lib/storage/store');
-      const matched = findStoreStudent(studentId);
-
-      const studentSession = matched ? {
-        id: matched.id,
-        student_id: matched.student_id,
-        first_name: matched.first_name,
-        last_name: matched.last_name,
-        name: `${matched.first_name} ${matched.last_name}`,
-        full_name: `${matched.first_name} ${matched.last_name}`,
-        class_name: matched.class?.name || 'JSS 1A',
-        class_id: matched.class_id,
-        admission_date: matched.admission_date || '2026-09-01',
-        status: matched.status || 'active',
-        role: 'student',
-      } : {
-        id: `std-${studentId.toLowerCase()}`,
-        student_id: studentId,
-        first_name: 'Student',
-        last_name: studentId,
-        name: `Student (${studentId})`,
-        full_name: `Student (${studentId})`,
-        class_name: 'JSS 1A',
-        class_id: '77777777-7777-7777-7777-777777777771',
-        admission_date: '2026-09-01',
-        status: 'active',
-        role: 'student',
+    if (studentRecord.status !== 'active') {
+      return {
+        success: false,
+        message:
+          'Your student account is currently inactive. Please contact the school administrative office.',
       };
+    }
 
-      // Set demo session cookie
-      const cookieStore = await cookies();
-      cookieStore.set('demo_student_session', JSON.stringify(studentSession), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24, // 24 hours
-        path: '/',
+    const supabase = await createClient();
+    const supabaseAdmin = createAdminClient();
+
+    // Sign out any prior session so another student's session never leaks
+    await supabase.auth.signOut();
+
+    // 2. Attempt standard Supabase Auth sign-in
+    let { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email: internalEmail,
+        password,
       });
 
+    // 3. If the student exists in public.students (e.g. newly imported) but their Auth user
+    // hasn't been synced yet and they are signing in with the default school password,
+    // provision/sync their Supabase Auth user and sign them in.
+    if ((authError || !authData.user) && password === 'Student@2026') {
+      const fullName = `${studentRecord.first_name} ${studentRecord.last_name}`.trim();
+      let userId = studentRecord.user_id || null;
+
+      if (!userId) {
+        const { data: usersList } = await supabaseAdmin.auth.admin.listUsers({
+          perPage: 1000,
+        });
+        const existingAuth = usersList?.users?.find(
+          (u) => u.email?.toLowerCase() === internalEmail
+        );
+        if (existingAuth) {
+          userId = existingAuth.id;
+        }
+      }
+
+      if (userId) {
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          email: internalEmail,
+          password,
+          email_confirm: true,
+          user_metadata: {
+            display_name: fullName,
+            role: 'student',
+            student_id: studentRecord.student_id,
+          },
+        });
+      } else {
+        const { data: created } = await supabaseAdmin.auth.admin.createUser({
+          email: internalEmail,
+          password,
+          email_confirm: true,
+          user_metadata: {
+            display_name: fullName,
+            role: 'student',
+            student_id: studentRecord.student_id,
+          },
+        });
+        userId = created.user?.id || null;
+      }
+
+      if (userId) {
+        await supabaseAdmin.from('profiles').upsert({
+          id: userId,
+          role: 'student',
+          display_name: fullName,
+          email: internalEmail,
+          updated_at: new Date().toISOString(),
+        });
+        await supabaseAdmin
+          .from('students')
+          .update({ user_id: userId })
+          .eq('id', studentRecord.id);
+
+        const retry = await supabase.auth.signInWithPassword({
+          email: internalEmail,
+          password,
+        });
+        authData = retry.data;
+        authError = retry.error;
+      }
+    }
+
+    if (authError || !authData.user) {
       return {
-        success: true,
-        message: `Welcome, ${studentSession.first_name}! Entering student portal...`,
-        redirectUrl: '/student',
+        success: false,
+        message:
+          'Invalid Student ID or password. Please verify your credentials or contact the school ICT desk.',
       };
     }
 
-    // Generic error message to prevent account enumeration
+    // 4. Bind the exact student UUID in an httpOnly cookie and clear any legacy demo cookies
+    const cookieStore = await cookies();
+    cookieStore.delete('demo_student_session');
+    cookieStore.set('student_portal_uid', studentRecord.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24, // 24 hours
+      path: '/',
+    });
+
     return {
-      success: false,
-      message: 'Invalid Student ID or password. Please verify your credentials or contact the school ICT desk.',
+      success: true,
+      message: `Welcome, ${studentRecord.first_name}! Entering student portal...`,
+      redirectUrl: '/student',
     };
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Authentication service error';
+    const errorMsg =
+      err instanceof Error ? err.message : 'Authentication service error';
     return {
       success: false,
       message: errorMsg,
@@ -139,6 +178,7 @@ export async function loginStudent(
 
 export async function logoutStudent() {
   const cookieStore = await cookies();
+  cookieStore.delete('student_portal_uid');
   cookieStore.delete('demo_student_session');
 
   try {

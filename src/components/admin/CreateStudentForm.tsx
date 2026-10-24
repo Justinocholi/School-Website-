@@ -2,12 +2,15 @@
 
 import React, { useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createStudentAction, AdminStudentActionState } from '@/app/actions/admin-student';
+import {
+  createStudentAction,
+  AdminStudentActionState,
+} from '@/app/actions/admin-student';
 import { ClassRecord } from '@/types/database.types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert } from '@/components/ui/alert';
-import { PlusCircle, ArrowLeft } from 'lucide-react';
+import { PlusCircle, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 
 const initialState: AdminStudentActionState = {
@@ -17,13 +20,17 @@ const initialState: AdminStudentActionState = {
 
 export function CreateStudentForm({ classes }: { classes: ClassRecord[] }) {
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState(createStudentAction, initialState);
+  const [state, formAction, isPending] = useActionState(
+    createStudentAction,
+    initialState
+  );
 
   useEffect(() => {
     if (state.success) {
       const timer = setTimeout(() => {
         router.push('/admin/students');
-      }, 1200);
+        router.refresh();
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [state, router]);
@@ -33,7 +40,7 @@ export function CreateStudentForm({ classes }: { classes: ClassRecord[] }) {
       {state.message && (
         <Alert
           variant={state.success ? 'success' : 'destructive'}
-          title={state.success ? 'Success' : 'Validation Error'}
+          title={state.success ? 'Student Created' : 'Validation Error'}
         >
           {state.message}
         </Alert>
@@ -65,7 +72,9 @@ export function CreateStudentForm({ classes }: { classes: ClassRecord[] }) {
             defaultValue=""
             className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
           >
-            <option value="" disabled>Select class</option>
+            <option value="" disabled>
+              Select class
+            </option>
             {classes.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name} ({c.level})
@@ -107,11 +116,30 @@ export function CreateStudentForm({ classes }: { classes: ClassRecord[] }) {
         </div>
       </div>
 
-      <div className="space-y-1.5 max-w-xs">
-        <label className="block text-xs font-semibold text-gray-700">
-          Admission Date
-        </label>
-        <Input name="admission_date" type="date" defaultValue="2026-09-01" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-gray-700">
+            Admission Date
+          </label>
+          <Input name="admission_date" type="date" defaultValue="2026-09-01" />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-gray-700 flex items-center gap-1">
+            <KeyRound className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Initial Portal Password</span>
+          </label>
+          <Input
+            name="password"
+            type="text"
+            defaultValue="Student@2026"
+            placeholder="Default: Student@2026"
+            className="font-mono text-xs"
+          />
+          {state.errors?.password && (
+            <p className="text-xs text-rose-600">{state.errors.password[0]}</p>
+          )}
+        </div>
       </div>
 
       <div className="pt-4 flex items-center gap-3">
@@ -121,7 +149,7 @@ export function CreateStudentForm({ classes }: { classes: ClassRecord[] }) {
           className="bg-emerald-800 hover:bg-emerald-900 text-white font-semibold text-xs"
         >
           <PlusCircle className="w-4 h-4 mr-1.5" />
-          Create Student Record
+          Create Student Account
         </Button>
         <Link href="/admin/students">
           <Button variant="outline" size="sm" type="button" className="text-xs">

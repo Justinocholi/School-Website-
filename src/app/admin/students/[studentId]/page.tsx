@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, User, KeyRound, AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
-import { getAdminStudents } from '@/lib/admin/admin-service';
+import { getAdminStudentById } from '@/lib/admin/admin-service';
 import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { deleteStudentAction } from '@/app/actions/admin-student';
 import { DeleteConfirmButton } from '@/components/admin/DeleteConfirmButton';
@@ -22,12 +22,10 @@ export default async function AdminStudentDetailPage({
   params: Promise<{ studentId: string }>;
 }) {
   const { studentId } = await params;
-  const [students, staff] = await Promise.all([
-    getAdminStudents(),
+  const [student, staff] = await Promise.all([
+    getAdminStudentById(studentId),
     getAuthenticatedStaff(),
   ]);
-
-  const student = students.find((s) => s.id === studentId || s.student_id.toUpperCase() === studentId.toUpperCase());
 
   if (!student) {
     notFound();

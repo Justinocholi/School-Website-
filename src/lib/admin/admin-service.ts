@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import {
   StudentRecord,
   ClassRecord,
@@ -11,172 +11,199 @@ import {
   StaffRecord,
 } from '@/types/database.types';
 import { evaluateGrade } from '@/lib/grading/grading-engine';
-import {
-  getStoreStudents,
-  findStoreStudent,
-  saveStoreStudent,
-  getStoreStaff,
-  saveStoreStaff,
-  getStoreResults,
-  saveStoreResult,
-  publishStoreResults,
-  getStoreTerms,
-  setStoreActiveTerm,
-  getStoreClasses,
-  saveStoreClass,
-  getStoreSubjects,
-  saveStoreSubject,
-  getStoreSessions,
-  getStoreActiveTermId,
-  deleteStoreStudent,
-  deleteStoreSubject,
-  deleteStoreStaff,
-  deleteStoreClass,
-  deleteStoreResult,
-} from '@/lib/storage/store';
 
-let mockAuditLogs: AuditLog[] = [
-  {
-    id: 'aud-1',
-    action: 'PUBLISH_RESULTS',
-    entity_type: 'results',
-    entity_id: 'c0000000-0000-0000-0000-000000000001',
-    change_summary: { subject: 'Mathematics', term: 'First Term', status: 'published' },
-    created_at: new Date().toISOString(),
-    actor_email: 'admin@greenfieldcollege.edu',
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CA_COMPONENT_ID = '44444444-4444-4444-4444-444444444441';
+const EXAM_COMPONENT_ID = '44444444-4444-4444-4444-444444444442';
+
+const DEFAULT_TEACHER_METADATA: Record<
+  string,
+  { department: string; assigned_class: string; assigned_subject: string }
+> = {
+  'david.adeleke@greenfieldcollege.edu': {
+    department: 'Junior Secondary (Form Teacher)',
+    assigned_class: 'JSS 1A',
+    assigned_subject: 'General Curriculum',
   },
-];
-
-let mockImportJobs: ImportJob[] = [
-  {
-    id: 'job-1',
-    import_type: 'students',
-    status: 'completed',
-    file_name: 'jss2_students_2026.xlsx',
-    total_rows: 25,
-    successful_rows: 25,
-    failed_rows: 0,
-    created_rows: 25,
-    updated_rows: 0,
-    created_at: new Date().toISOString(),
+  'grace.danjuma@greenfieldcollege.edu': {
+    department: 'Junior Secondary (Form Teacher)',
+    assigned_class: 'JSS 2A',
+    assigned_subject: 'General Curriculum',
   },
-];
+  'samuel.osei@greenfieldcollege.edu': {
+    department: 'Senior Secondary (Form Teacher)',
+    assigned_class: 'SS 1 Science',
+    assigned_subject: 'General Curriculum',
+  },
+};
 
-function isSupabaseConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  return !url.includes('placeholder') && !key.includes('placeholder') && url.startsWith('http');
+function isUuid(value?: string | null): boolean {
+  return Boolean(value && UUID_REGEX.test(value.trim()));
 }
 
-export async function getAdminOverviewStats(classFilter?: string) {
-  let students = getStoreStudents();
-  let results = getStoreResults();
-  let classes = getStoreClasses();
-  let subjects = getStoreSubjects();
-
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      let studentQ = supabase.from('students').select('*', { count: 'exact', head: true });
-      let pendingResultQ = supabase.from('results').select('*', { count: 'exact', head: true }).eq('status', 'pending_review');
-      let publishedResultQ = supabase.from('results').select('*', { count: 'exact', head: true }).eq('status', 'published');
-
-      if (classFilter) {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(classFilter);
-        let targetClassId: string | undefined = isUuid ? classFilter : undefined;
-        if (!targetClassId) {
-          const { data: cls } = await supabase.from('classes').select('id').ilike('name', classFilter).maybeSingle();
-          targetClassId = cls?.id;
-        }
-        if (targetClassId) {
-          studentQ = studentQ.eq('class_id', targetClassId);
-          pendingResultQ = pendingResultQ.eq('class_id', targetClassId);
-          publishedResultQ = publishedResultQ.eq('class_id', targetClassId);
-        }
-      }
-
-      const [{ count: studentCount }, { count: classCount }, { count: subjectCount }, { count: pendingResultCount }, { count: publishedResultCount }] = await Promise.all([
-        studentQ,
-        supabase.from('classes').select('*', { count: 'exact', head: true }),
-        supabase.from('subjects').select('*', { count: 'exact', head: true }),
-        pendingResultQ,
-        publishedResultQ,
-      ]);
-
-      if (studentCount !== null && studentCount > 0) {
-        return {
-          totalStudents: studentCount,
-          totalClasses: classFilter ? 1 : (classCount || classes.length),
-          totalSubjects: subjectCount || subjects.length,
-          pendingResults: pendingResultCount || 0,
-          publishedResults: publishedResultCount || 0,
-          recentImports: mockImportJobs.slice(0, 5),
-          recentActivity: mockAuditLogs.slice(0, 5),
-        };
-      }
-    } catch {
-      // Database fallback
-    }
-  }
-
-  if (classFilter) {
-    const cfLower = classFilter.toLowerCase();
-    students = students.filter(s => s.class?.name.toLowerCase() === cfLower || s.class_id === classFilter || s.class?.id === classFilter);
-    results = results.filter(r => r.class?.name.toLowerCase() === cfLower || r.class_id === classFilter || r.class?.id === classFilter);
-  }
-
+function normalizeResultRecord(raw: any): ResultRecord {
   return {
-    totalStudents: students.length,
-    totalClasses: classFilter ? 1 : classes.length,
-    totalSubjects: subjects.length,
-    pendingResults: results.filter(r => r.status === 'pending_review').length,
-    publishedResults: results.filter(r => r.status === 'published').length,
-    recentImports: mockImportJobs.slice(0, 5),
-    recentActivity: mockAuditLogs.slice(0, 5),
+    ...raw,
+    total_score: Number(raw.total_score ?? 0),
+    scores: Array.isArray(raw.scores)
+      ? raw.scores.map((s: any) => ({
+          ...s,
+          score: Number(s.score ?? 0),
+          component: s.component
+            ? {
+                ...s.component,
+                maximum_score: Number(s.component.maximum_score ?? 0),
+              }
+            : undefined,
+        }))
+      : [],
   };
 }
 
-export async function getAdminStudents(query?: string, classId?: string, status?: string): Promise<StudentRecord[]> {
-  let list = [...getStoreStudents()];
+export async function getAdminOverviewStats(classFilter?: string) {
+  const supabase = createAdminClient();
 
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      let q = supabase
-        .from('students')
-        .select('*, class:classes(id, name, level)')
-        .order('student_id');
-
-      const { data, error } = await q;
-      if (!error && data && data.length > 0) {
-        const dbStudents = data as unknown as StudentRecord[];
-        for (const s of dbStudents) {
-          if (!list.some(item => item.student_id.toUpperCase() === s.student_id.toUpperCase())) {
-            list.push(s);
-          }
-        }
-      }
-    } catch {
-      // fallback to store
+  let targetClassId: string | undefined;
+  if (classFilter) {
+    if (isUuid(classFilter)) {
+      targetClassId = classFilter.trim();
+    } else {
+      const { data: cls } = await supabase
+        .from('classes')
+        .select('id')
+        .ilike('name', classFilter.trim())
+        .maybeSingle();
+      targetClassId = cls?.id;
     }
   }
 
-  if (query) {
-    const q = query.toLowerCase();
-    list = list.filter(s =>
-      s.student_id.toLowerCase().includes(q) ||
-      s.first_name.toLowerCase().includes(q) ||
-      s.last_name.toLowerCase().includes(q)
+  let studentQ = supabase.from('students').select('*', { count: 'exact', head: true });
+  let pendingResultQ = supabase
+    .from('results')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'pending_review');
+  let publishedResultQ = supabase
+    .from('results')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'published');
+
+  if (classFilter) {
+    if (targetClassId) {
+      studentQ = studentQ.eq('class_id', targetClassId);
+      pendingResultQ = pendingResultQ.eq('class_id', targetClassId);
+      publishedResultQ = publishedResultQ.eq('class_id', targetClassId);
+    } else {
+      return {
+        totalStudents: 0,
+        totalClasses: 1,
+        totalSubjects: 0,
+        pendingResults: 0,
+        publishedResults: 0,
+        recentImports: [] as ImportJob[],
+        recentActivity: [] as AuditLog[],
+      };
+    }
+  }
+
+  const [
+    { count: studentCount },
+    { count: classCount },
+    { count: subjectCount },
+    { count: pendingResultCount },
+    { count: publishedResultCount },
+    { data: recentImportsData },
+    recentActivity,
+  ] = await Promise.all([
+    studentQ,
+    supabase.from('classes').select('*', { count: 'exact', head: true }),
+    supabase.from('subjects').select('*', { count: 'exact', head: true }),
+    pendingResultQ,
+    publishedResultQ,
+    supabase
+      .from('import_jobs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5),
+    getAdminAuditLogs(5),
+  ]);
+
+  return {
+    totalStudents: studentCount ?? 0,
+    totalClasses: classFilter ? 1 : (classCount ?? 0),
+    totalSubjects: subjectCount ?? 0,
+    pendingResults: pendingResultCount ?? 0,
+    publishedResults: publishedResultCount ?? 0,
+    recentImports: (recentImportsData as ImportJob[]) || [],
+    recentActivity,
+  };
+}
+
+export async function getAdminStudents(
+  query?: string,
+  classId?: string,
+  status?: string
+): Promise<StudentRecord[]> {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from('students')
+    .select('*, class:classes(id, name, level, status, created_at)')
+    .order('student_id', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to load students: ${error.message}`);
+  }
+
+  let list = (data as unknown as StudentRecord[]) || [];
+
+  if (query && query.trim()) {
+    const q = query.trim().toLowerCase();
+    list = list.filter(
+      (s) =>
+        s.student_id.toLowerCase().includes(q) ||
+        s.first_name.toLowerCase().includes(q) ||
+        s.last_name.toLowerCase().includes(q) ||
+        (s.other_names && s.other_names.toLowerCase().includes(q))
     );
   }
-  if (classId) {
-    const cLower = classId.toLowerCase();
-    list = list.filter(s => s.class_id === classId || s.class?.id === classId || s.class?.name.toLowerCase() === cLower);
+
+  if (classId && classId.trim()) {
+    const cLower = classId.trim().toLowerCase();
+    list = list.filter(
+      (s) =>
+        s.class_id === classId ||
+        s.class?.id === classId ||
+        s.class?.name?.toLowerCase() === cLower
+    );
   }
-  if (status) {
-    list = list.filter(s => s.status === status);
+
+  if (status && status.trim()) {
+    list = list.filter((s) => s.status === status.trim());
   }
+
   return list;
+}
+
+export async function getAdminStudentById(
+  studentIdOrId: string
+): Promise<StudentRecord | null> {
+  const supabase = createAdminClient();
+  const trimmed = studentIdOrId.trim();
+  if (!trimmed) return null;
+
+  let query = supabase
+    .from('students')
+    .select('*, class:classes(id, name, level, status, created_at)');
+
+  if (isUuid(trimmed)) {
+    query = query.eq('id', trimmed);
+  } else {
+    query = query.ilike('student_id', trimmed.toUpperCase());
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error || !data) return null;
+  return data as unknown as StudentRecord;
 }
 
 export async function addAdminStudent(data: {
@@ -186,239 +213,419 @@ export async function addAdminStudent(data: {
   other_names?: string;
   class_id?: string;
   admission_date?: string;
+  password?: string;
+  updateIfExists?: boolean;
 }): Promise<StudentRecord> {
-  const normId = data.student_id.toUpperCase().trim();
-  const classes = getStoreClasses();
-  const assignedClass = classes.find(c => c.id === data.class_id || c.name.toLowerCase() === data.class_id?.toLowerCase());
+  const supabase = createAdminClient();
+  const normId = data.student_id.trim().toUpperCase();
+  const firstName = data.first_name.trim();
+  const lastName = data.last_name.trim();
+  const otherNames = data.other_names?.trim() || null;
+  const fullName = `${firstName} ${lastName}`.trim();
+  const internalEmail = `${normId.toLowerCase()}@student.greenfieldcollege.edu`;
+  const studentPassword = data.password?.trim() || 'Student@2026';
 
-  const existing = findStoreStudent(normId);
-  if (existing) {
-    throw new Error(`Student ID ${normId} already exists`);
-  }
-
-  const newStudent: StudentRecord = {
-    id: `std-${Date.now()}`,
-    student_id: normId,
-    first_name: data.first_name.trim(),
-    last_name: data.last_name.trim(),
-    other_names: data.other_names?.trim(),
-    class_id: assignedClass?.id || data.class_id,
-    admission_date: data.admission_date || new Date().toISOString().split('T')[0],
-    status: 'active',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    class: assignedClass,
-  };
-
-  saveStoreStudent(newStudent);
-
-  // Attempt Supabase insert
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase.from('students').insert({
-        student_id: newStudent.student_id,
-        first_name: newStudent.first_name,
-        last_name: newStudent.last_name,
-        other_names: newStudent.other_names || null,
-        class_id: newStudent.class_id || null,
-        admission_date: newStudent.admission_date || null,
-        status: 'active',
-      });
-    } catch {
-      // Supabase RLS / offline gracefully handled
+  // Resolve class_id (accept UUID or class name)
+  let resolvedClassId: string | null = null;
+  if (data.class_id && data.class_id.trim()) {
+    if (isUuid(data.class_id)) {
+      resolvedClassId = data.class_id.trim();
+    } else {
+      const { data: cls } = await supabase
+        .from('classes')
+        .select('id')
+        .ilike('name', data.class_id.trim())
+        .maybeSingle();
+      resolvedClassId = cls?.id || null;
     }
   }
 
-  recordAuditLog('CREATE_STUDENT', 'students', newStudent.id, {
-    student_id: newStudent.student_id,
-    name: `${newStudent.first_name} ${newStudent.last_name}`,
-    class: assignedClass?.name,
-  });
+  // Check if student already exists in public.students
+  const { data: existingStudent } = await supabase
+    .from('students')
+    .select('id, user_id, student_id')
+    .ilike('student_id', normId)
+    .maybeSingle();
 
-  return newStudent;
+  if (existingStudent && !data.updateIfExists) {
+    throw new Error(`Student ID ${normId} already exists in the school database.`);
+  }
+
+  // Provision or update Supabase Auth user for this student
+  let authUserId: string | null = existingStudent?.user_id || null;
+
+  try {
+    if (authUserId) {
+      await supabase.auth.admin.updateUserById(authUserId, {
+        email: internalEmail,
+        password: studentPassword,
+        email_confirm: true,
+        user_metadata: {
+          display_name: fullName,
+          role: 'student',
+          student_id: normId,
+        },
+      });
+    } else {
+      const { data: createdAuth, error: authErr } =
+        await supabase.auth.admin.createUser({
+          email: internalEmail,
+          password: studentPassword,
+          email_confirm: true,
+          user_metadata: {
+            display_name: fullName,
+            role: 'student',
+            student_id: normId,
+          },
+        });
+
+      if (!authErr && createdAuth.user) {
+        authUserId = createdAuth.user.id;
+      } else if (authErr) {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('email', internalEmail)
+          .maybeSingle();
+
+        if (existingProfile?.id) {
+          const existingAuthId = String(existingProfile.id);
+          authUserId = existingAuthId;
+          await supabase.auth.admin.updateUserById(existingAuthId, {
+            password: studentPassword,
+            email_confirm: true,
+            user_metadata: {
+              display_name: fullName,
+              role: 'student',
+              student_id: normId,
+            },
+          });
+        }
+      }
+    }
+
+    if (authUserId) {
+      await supabase.from('profiles').upsert({
+        id: authUserId,
+        role: 'student',
+        display_name: fullName,
+        email: internalEmail,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  } catch (err) {
+    console.error('Student auth provisioning notice:', err);
+  }
+
+  let savedStudent: any;
+
+  if (existingStudent && data.updateIfExists) {
+    const { data: updated, error: updateErr } = await supabase
+      .from('students')
+      .update({
+        user_id: authUserId,
+        first_name: firstName,
+        last_name: lastName,
+        other_names: otherNames,
+        class_id: resolvedClassId,
+        admission_date:
+          data.admission_date || new Date().toISOString().split('T')[0],
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingStudent.id)
+      .select('*, class:classes(id, name, level, status, created_at)')
+      .single();
+
+    if (updateErr || !updated) {
+      throw new Error(updateErr?.message || 'Failed to update student in Supabase.');
+    }
+    savedStudent = updated;
+  } else {
+    const { data: inserted, error: insertErr } = await supabase
+      .from('students')
+      .insert({
+        user_id: authUserId,
+        student_id: normId,
+        first_name: firstName,
+        last_name: lastName,
+        other_names: otherNames,
+        class_id: resolvedClassId,
+        admission_date:
+          data.admission_date || new Date().toISOString().split('T')[0],
+        status: 'active',
+      })
+      .select('*, class:classes(id, name, level, status, created_at)')
+      .single();
+
+    if (insertErr || !inserted) {
+      throw new Error(insertErr?.message || 'Failed to create student in Supabase.');
+    }
+    savedStudent = inserted;
+  }
+
+  await recordAuditLog(
+    existingStudent ? 'UPDATE_STUDENT' : 'CREATE_STUDENT',
+    'students',
+    savedStudent.id,
+    {
+      student_id: savedStudent.student_id,
+      name: `${savedStudent.first_name} ${savedStudent.last_name}`,
+      class: savedStudent.class?.name || null,
+    }
+  );
+
+  return savedStudent as unknown as StudentRecord;
 }
 
 export async function getAdminClasses(): Promise<ClassRecord[]> {
-  let list = [...getStoreClasses()];
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      const { data, error } = await supabase.from('classes').select('*').order('name');
-      if (!error && data && data.length > 0) {
-        return data as ClassRecord[];
-      }
-    } catch {}
-  }
-  return list;
-}
+  const supabase = createAdminClient();
 
-export async function addAdminClass(data: { name: string; level: string }): Promise<ClassRecord> {
-  const existing = getStoreClasses().find(c => c.name.toLowerCase() === data.name.toLowerCase());
-  if (existing) {
-    throw new Error(`Class name "${data.name}" already exists`);
+  const [{ data: classes, error }, { data: students }] = await Promise.all([
+    supabase.from('classes').select('*').order('name'),
+    supabase.from('students').select('class_id').eq('status', 'active'),
+  ]);
+
+  if (error) {
+    throw new Error(`Failed to fetch classes: ${error.message}`);
   }
 
-  const newClass: ClassRecord = {
-    id: `cls-${Date.now()}`,
-    name: data.name.trim(),
-    level: data.level.trim(),
-    status: 'active',
-    student_count: 0,
-    created_at: new Date().toISOString(),
-  };
-
-  saveStoreClass(newClass);
-
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase.from('classes').insert({ name: newClass.name, level: newClass.level, status: 'active' });
-    } catch {}
-  }
-
-  recordAuditLog('CREATE_CLASS', 'classes', newClass.id, { name: newClass.name, level: newClass.level });
-  return newClass;
-}
-
-export async function getAdminSubjects(): Promise<SubjectRecord[]> {
-  let list = [...getStoreSubjects()];
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      const { data, error } = await supabase.from('subjects').select('*').order('name');
-      if (!error && data && data.length > 0) {
-        return data as SubjectRecord[];
-      }
-    } catch {}
-  }
-  return list;
-}
-
-export async function addAdminSubject(data: { name: string; code: string }): Promise<SubjectRecord> {
-  const existing = getStoreSubjects().find(s => s.code.toLowerCase() === data.code.toLowerCase());
-  if (existing) {
-    throw new Error(`Subject code "${data.code}" already exists`);
-  }
-
-  const newSubject: SubjectRecord = {
-    id: `sub-${Date.now()}`,
-    name: data.name.trim(),
-    code: data.code.toUpperCase().trim(),
-    status: 'active',
-    created_at: new Date().toISOString(),
-  };
-
-  saveStoreSubject(newSubject);
-
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase.from('subjects').insert({ name: newSubject.name, code: newSubject.code, status: 'active' });
-    } catch {}
-  }
-
-  recordAuditLog('CREATE_SUBJECT', 'subjects', newSubject.id, { name: newSubject.name, code: newSubject.code });
-  return newSubject;
-}
-
-export async function getAdminSessions(): Promise<AcademicSession[]> {
-  let list = [...getStoreSessions()];
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      const { data, error } = await supabase.from('academic_sessions').select('*').order('start_date', { ascending: false });
-      if (!error && data && data.length > 0) {
-        return data as AcademicSession[];
-      }
-    } catch {}
-  }
-  return list;
-}
-
-export async function getAdminTerms(): Promise<TermRecord[]> {
-  const storeTerms = getStoreTerms();
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      const { data, error } = await supabase.from('terms').select('*').order('sequence_number');
-      if (!error && data && data.length > 0) {
-        const activeTermId = getStoreActiveTermId();
-        return (data as TermRecord[]).map(t => ({
-          ...t,
-          is_active: t.id === activeTermId || (activeTermId ? t.id === activeTermId : t.is_active),
-        }));
-      }
-    } catch {}
-  }
-  return storeTerms;
-}
-
-export async function setActiveAdminTerm(termId: string) {
-  setStoreActiveTerm(termId);
-
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase.from('terms').update({ is_active: false }).neq('id', termId);
-      await supabase.from('terms').update({ is_active: true }).eq('id', termId);
-      await supabase.from('school_settings').update({ current_term_id: termId }).neq('id', '00000000-0000-0000-0000-000000000000');
-    } catch (err) {
-      console.error('Supabase active term update failed:', err);
+  const counts = new Map<string, number>();
+  for (const s of students || []) {
+    if (s.class_id) {
+      counts.set(s.class_id, (counts.get(s.class_id) || 0) + 1);
     }
   }
 
-  recordAuditLog('SET_ACTIVE_TERM', 'terms', termId, { active_term_id: termId });
+  return ((classes as ClassRecord[]) || []).map((c) => ({
+    ...c,
+    student_count: counts.get(c.id) ?? 0,
+  }));
+}
+
+export async function addAdminClass(data: {
+  name: string;
+  level: string;
+}): Promise<ClassRecord> {
+  const supabase = createAdminClient();
+  const cleanName = data.name.trim();
+  const cleanLevel = data.level.trim();
+
+  const { data: existing } = await supabase
+    .from('classes')
+    .select('id')
+    .ilike('name', cleanName)
+    .maybeSingle();
+
+  if (existing) {
+    throw new Error(`Class "${cleanName}" already exists.`);
+  }
+
+  const { data: inserted, error } = await supabase
+    .from('classes')
+    .insert({
+      name: cleanName,
+      level: cleanLevel,
+      status: 'active',
+    })
+    .select('*')
+    .single();
+
+  if (error || !inserted) {
+    throw new Error(error?.message || 'Failed to create class.');
+  }
+
+  await recordAuditLog('CREATE_CLASS', 'classes', inserted.id, {
+    name: inserted.name,
+    level: inserted.level,
+  });
+
+  return { ...(inserted as ClassRecord), student_count: 0 };
+}
+
+export async function getAdminSubjects(): Promise<SubjectRecord[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('subjects')
+    .select('*')
+    .order('name');
+
+  if (error) {
+    throw new Error(`Failed to fetch subjects: ${error.message}`);
+  }
+
+  return (data as SubjectRecord[]) || [];
+}
+
+export async function addAdminSubject(data: {
+  name: string;
+  code: string;
+}): Promise<SubjectRecord> {
+  const supabase = createAdminClient();
+  const cleanName = data.name.trim();
+  const cleanCode = data.code.trim().toUpperCase();
+
+  const { data: existing } = await supabase
+    .from('subjects')
+    .select('id')
+    .ilike('code', cleanCode)
+    .maybeSingle();
+
+  if (existing) {
+    throw new Error(`Subject code "${cleanCode}" already exists.`);
+  }
+
+  const { data: inserted, error } = await supabase
+    .from('subjects')
+    .insert({
+      name: cleanName,
+      code: cleanCode,
+      status: 'active',
+    })
+    .select('*')
+    .single();
+
+  if (error || !inserted) {
+    throw new Error(error?.message || 'Failed to create subject.');
+  }
+
+  await recordAuditLog('CREATE_SUBJECT', 'subjects', inserted.id, {
+    name: inserted.name,
+    code: inserted.code,
+  });
+
+  return inserted as SubjectRecord;
+}
+
+export async function getAdminSessions(): Promise<AcademicSession[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('academic_sessions')
+    .select('*')
+    .order('start_date', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to fetch academic sessions: ${error.message}`);
+  }
+
+  return (data as AcademicSession[]) || [];
+}
+
+export async function getAdminTerms(): Promise<TermRecord[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('terms')
+    .select('*, session:academic_sessions(*)')
+    .order('sequence_number', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to fetch academic terms: ${error.message}`);
+  }
+
+  return (data as unknown as TermRecord[]) || [];
+}
+
+export async function setActiveAdminTerm(termId: string) {
+  const supabase = createAdminClient();
+
+  const { error: deactivateErr } = await supabase
+    .from('terms')
+    .update({ is_active: false })
+    .neq('id', termId);
+
+  if (deactivateErr) {
+    throw new Error(`Failed to update terms: ${deactivateErr.message}`);
+  }
+
+  const { error: activateErr } = await supabase
+    .from('terms')
+    .update({ is_active: true })
+    .eq('id', termId);
+
+  if (activateErr) {
+    throw new Error(`Failed to activate term: ${activateErr.message}`);
+  }
+
+  await supabase
+    .from('school_settings')
+    .update({ current_term_id: termId, updated_at: new Date().toISOString() })
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+
+  await recordAuditLog('SET_ACTIVE_TERM', 'terms', termId, {
+    active_term_id: termId,
+  });
+
   return { success: true };
 }
 
-export async function getAdminResults(filters?: { termId?: string; classId?: string; subjectId?: string; status?: string }): Promise<ResultRecord[]> {
-  let list = [...getStoreResults()];
+export async function getAdminResults(filters?: {
+  termId?: string;
+  classId?: string;
+  subjectId?: string;
+  status?: string;
+  studentId?: string;
+}): Promise<ResultRecord[]> {
+  const supabase = createAdminClient();
 
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      let q = supabase
-        .from('results')
-        .select(`
-          id, student_id, subject_id, class_id, term_id, status, total_score, grade, remarks, published_at, created_at, updated_at,
-          student:students(id, student_id, first_name, last_name),
-          subject:subjects(id, name, code),
-          class:classes(id, name, level),
-          scores:result_scores(id, score, assessment_component_id, component:assessment_components(id, name, code, maximum_score))
-        `)
-        .order('created_at', { ascending: false });
+  let query = supabase
+    .from('results')
+    .select(
+      `
+      id, student_id, subject_id, class_id, term_id, status, total_score, grade, remarks, published_at, created_at, updated_at,
+      student:students(id, user_id, student_id, first_name, last_name, other_names, class_id, admission_date, status, created_at, updated_at),
+      subject:subjects(id, name, code, status, created_at),
+      class:classes(id, name, level, status, created_at),
+      term:terms(id, name, sequence_number, is_active, academic_session_id),
+      scores:result_scores(id, result_id, score, assessment_component_id, component:assessment_components(id, name, code, maximum_score, sequence_number, is_active))
+    `
+    )
+    .order('created_at', { ascending: false });
 
-      const { data, error } = await q;
-      if (!error && data && data.length > 0) {
-        const dbResults = data as unknown as ResultRecord[];
-        for (const r of dbResults) {
-          if (!list.some(item => item.id === r.id)) {
-            list.unshift(r);
-          }
-        }
-      }
-    } catch {}
+  if (filters?.termId && isUuid(filters.termId)) {
+    query = query.eq('term_id', filters.termId.trim());
+  }
+  if (filters?.subjectId && isUuid(filters.subjectId)) {
+    query = query.eq('subject_id', filters.subjectId.trim());
+  }
+  if (filters?.status && filters.status.trim()) {
+    query = query.eq('status', filters.status.trim());
   }
 
-  if (filters?.termId) {
-    list = list.filter(r => r.term_id === filters.termId);
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Failed to fetch results: ${error.message}`);
   }
-  if (filters?.classId) {
-    const cLower = filters.classId.toLowerCase();
-    list = list.filter(r => r.class_id === filters.classId || r.class?.id === filters.classId || r.class?.name.toLowerCase() === cLower);
+
+  let list = ((data as any[]) || []).map(normalizeResultRecord);
+
+  if (filters?.classId && filters.classId.trim()) {
+    const cTrim = filters.classId.trim();
+    const cLower = cTrim.toLowerCase();
+    list = list.filter(
+      (r) =>
+        r.class_id === cTrim ||
+        r.class?.id === cTrim ||
+        r.class?.name?.toLowerCase() === cLower ||
+        r.student?.class_id === cTrim
+    );
   }
-  if (filters?.subjectId) {
-    list = list.filter(r => r.subject_id === filters.subjectId);
+
+  if (filters?.studentId && filters.studentId.trim()) {
+    const sTrim = filters.studentId.trim();
+    const sUpper = sTrim.toUpperCase();
+    list = list.filter(
+      (r) =>
+        r.student_id === sTrim ||
+        r.student?.id === sTrim ||
+        r.student?.student_id?.toUpperCase() === sUpper
+    );
   }
-  if (filters?.status) {
-    list = list.filter(r => r.status === filters.status);
-  }
+
   return list;
 }
 
 export async function saveSingleResult(data: {
-  student_id: string; // student DB id or Admission number (e.g. GFS001)
+  student_id: string; // Student UUID or Admission Number (e.g. GFS001)
   subject_id: string;
   class_id: string;
   term_id: string;
@@ -426,206 +633,283 @@ export async function saveSingleResult(data: {
   exam_score: number;
   status: 'draft' | 'pending_review' | 'published';
 }): Promise<ResultRecord> {
+  const supabase = createAdminClient();
   const total = Number(data.ca_score) + Number(data.exam_score);
   const evalResult = evaluateGrade(total);
 
-  // Look up student from store
-  const student = findStoreStudent(data.student_id);
-  const subjects = getStoreSubjects();
-  const subject = subjects.find(s => s.id === data.subject_id);
-  const classes = getStoreClasses();
-  const classItem = classes.find(c => c.id === data.class_id || c.name.toLowerCase() === data.class_id.toLowerCase());
+  // 1. Resolve student in Supabase by UUID or Admission ID
+  const student = await getAdminStudentById(data.student_id);
+  if (!student) {
+    throw new Error(
+      `Student "${data.student_id}" was not found in the school database.`
+    );
+  }
 
-  // Check if result already exists for this student, subject, and term
-  const existingResults = getStoreResults();
-  const existing = existingResults.find(r =>
-    (r.student_id === data.student_id || r.student_id === student?.id || r.student?.student_id.toUpperCase() === data.student_id.toUpperCase()) &&
-    r.subject_id === data.subject_id &&
-    r.term_id === data.term_id
-  );
+  // 2. Resolve class_id (prefer student's enrolled class if valid, or resolve provided class_id)
+  let resolvedClassId = student.class_id || null;
+  if (data.class_id && data.class_id.trim()) {
+    if (isUuid(data.class_id)) {
+      resolvedClassId = student.class_id || data.class_id.trim();
+    } else {
+      const { data: cls } = await supabase
+        .from('classes')
+        .select('id')
+        .ilike('name', data.class_id.trim())
+        .maybeSingle();
+      if (cls?.id) {
+        resolvedClassId = cls.id;
+      }
+    }
+  }
 
-  const resultId = existing ? existing.id : `c-${Date.now()}`;
+  if (!resolvedClassId) {
+    const { data: firstClass } = await supabase
+      .from('classes')
+      .select('id')
+      .limit(1)
+      .single();
+    resolvedClassId = firstClass?.id || null;
+  }
 
-  const studentObj: StudentRecord = student || {
-    id: data.student_id,
-    student_id: data.student_id.toUpperCase(),
-    first_name: 'Student',
-    last_name: data.student_id.toUpperCase(),
-    class_id: data.class_id,
-    status: 'active',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    class: classItem,
-  };
+  if (!resolvedClassId) {
+    throw new Error('Unable to resolve a valid class for this result.');
+  }
 
-  const resultRecord: ResultRecord = {
-    id: resultId,
-    student_id: studentObj.id,
-    subject_id: data.subject_id,
-    class_id: classItem?.id || data.class_id,
-    term_id: data.term_id,
-    status: data.status,
-    total_score: total,
-    grade: evalResult.grade,
-    remarks: evalResult.remark,
-    published_at: data.status === 'published' ? new Date().toISOString() : null,
-    created_at: existing ? existing.created_at : new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    student: studentObj,
-    subject: subject || { id: data.subject_id, name: 'Subject', code: 'SUB', status: 'active', created_at: '' },
-    class: classItem || { id: data.class_id, name: 'Class', level: 'General', status: 'active', created_at: '' },
-    scores: [
-      { id: `sc-${resultId}-1`, result_id: resultId, assessment_component_id: '44444444-4444-4444-4444-444444444441', score: Number(data.ca_score), component: { id: '44444444-4444-4444-4444-444444444441', name: 'CA', code: 'ca', maximum_score: 30, sequence_number: 1, is_active: true, created_at: '' } },
-      { id: `sc-${resultId}-2`, result_id: resultId, assessment_component_id: '44444444-4444-4444-4444-444444444442', score: Number(data.exam_score), component: { id: '44444444-4444-4444-4444-444444444442', name: 'Exam', code: 'exam', maximum_score: 70, sequence_number: 2, is_active: true, created_at: '' } },
-    ],
-  };
+  // 3. Check if result already exists for (student.id, subject_id, term_id)
+  const { data: existing } = await supabase
+    .from('results')
+    .select('id, published_at, created_at')
+    .eq('student_id', student.id)
+    .eq('subject_id', data.subject_id)
+    .eq('term_id', data.term_id)
+    .maybeSingle();
 
-  // Save to persistent storage
-  saveStoreResult(resultRecord);
+  const nowIso = new Date().toISOString();
+  const publishedAt =
+    data.status === 'published'
+      ? existing?.published_at || nowIso
+      : null;
 
-  // Attempt Supabase upsert
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase.from('results').upsert({
-        id: resultRecord.id,
-        student_id: resultRecord.student_id,
-        subject_id: resultRecord.subject_id,
-        class_id: resultRecord.class_id,
-        term_id: resultRecord.term_id,
+  // 4. Upsert into public.results
+  const { data: upserted, error: upsertErr } = await supabase
+    .from('results')
+    .upsert(
+      {
+        ...(existing?.id ? { id: existing.id } : {}),
+        student_id: student.id,
+        subject_id: data.subject_id,
+        class_id: resolvedClassId,
+        term_id: data.term_id,
+        status: data.status,
         total_score: total,
         grade: evalResult.grade,
         remarks: evalResult.remark,
-        status: data.status,
-        published_at: resultRecord.published_at,
-        updated_at: resultRecord.updated_at,
-      }, { onConflict: 'student_id,subject_id,term_id' });
-    } catch (err) {
-      console.error('Supabase results upsert error (handled):', err);
-    }
+        published_at: publishedAt,
+        updated_at: nowIso,
+      },
+      { onConflict: 'student_id,subject_id,term_id' }
+    )
+    .select('id')
+    .single();
+
+  if (upsertErr || !upserted) {
+    throw new Error(upsertErr?.message || 'Failed to save result to Supabase.');
   }
 
-  recordAuditLog(existing ? 'UPDATE_RESULT' : 'CREATE_RESULT', 'results', resultRecord.id, {
-    student_id: studentObj.student_id,
-    subject: subject?.name,
-    term_id: data.term_id,
-    total_score: total,
-    grade: evalResult.grade,
-    status: data.status,
-  });
+  // 5. Upsert CA and Exam scores into public.result_scores
+  const { error: scoresErr } = await supabase.from('result_scores').upsert(
+    [
+      {
+        result_id: upserted.id,
+        assessment_component_id: CA_COMPONENT_ID,
+        score: Number(data.ca_score),
+      },
+      {
+        result_id: upserted.id,
+        assessment_component_id: EXAM_COMPONENT_ID,
+        score: Number(data.exam_score),
+      },
+    ],
+    { onConflict: 'result_id,assessment_component_id' }
+  );
 
-  return resultRecord;
+  if (scoresErr) {
+    throw new Error(`Failed to save component scores: ${scoresErr.message}`);
+  }
+
+  // 6. Fetch complete enriched ResultRecord
+  const { data: fullResult, error: fetchErr } = await supabase
+    .from('results')
+    .select(
+      `
+      id, student_id, subject_id, class_id, term_id, status, total_score, grade, remarks, published_at, created_at, updated_at,
+      student:students(id, user_id, student_id, first_name, last_name, other_names, class_id, admission_date, status, created_at, updated_at),
+      subject:subjects(id, name, code, status, created_at),
+      class:classes(id, name, level, status, created_at),
+      term:terms(id, name, sequence_number, is_active, academic_session_id),
+      scores:result_scores(id, result_id, score, assessment_component_id, component:assessment_components(id, name, code, maximum_score, sequence_number, is_active))
+    `
+    )
+    .eq('id', upserted.id)
+    .single();
+
+  if (fetchErr || !fullResult) {
+    throw new Error(fetchErr?.message || 'Failed to load saved result.');
+  }
+
+  const normalized = normalizeResultRecord(fullResult);
+
+  await recordAuditLog(
+    existing ? 'UPDATE_RESULT' : 'CREATE_RESULT',
+    'results',
+    normalized.id,
+    {
+      student_id: student.student_id,
+      student_name: `${student.first_name} ${student.last_name}`,
+      subject: normalized.subject?.name,
+      term_id: data.term_id,
+      total_score: total,
+      grade: evalResult.grade,
+      status: data.status,
+    }
+  );
+
+  return normalized;
 }
 
-export async function publishResultBatch(resultIds: string[], reason: string = 'Authorized publication') {
-  const count = publishStoreResults(resultIds);
+export async function publishResultBatch(
+  resultIds: string[],
+  reason: string = 'Authorized publication'
+) {
+  const supabase = createAdminClient();
+  const validIds = resultIds.filter((id) => isUuid(id));
 
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase
-        .from('results')
-        .update({
-          status: 'published',
-          published_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .in('id', resultIds);
-    } catch (err) {
-      console.error('Error publishing in Supabase:', err);
-    }
+  if (validIds.length === 0) {
+    return { count: 0 };
   }
 
-  recordAuditLog('PUBLISH_RESULTS_BATCH', 'results', null, {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('results')
+    .update({
+      status: 'published',
+      published_at: nowIso,
+      updated_at: nowIso,
+    })
+    .in('id', validIds)
+    .select('id');
+
+  if (error) {
+    throw new Error(`Failed to publish results: ${error.message}`);
+  }
+
+  const count = data?.length ?? 0;
+
+  await recordAuditLog('PUBLISH_RESULTS_BATCH', 'results', null, {
     count,
     reason,
-    result_ids: resultIds,
+    result_ids: validIds,
   });
 
   return { count };
 }
 
-export function recordAuditLog(
+export async function recordAuditLog(
   action: string,
   entity_type: string,
   entity_id: string | null,
   change_summary: Record<string, unknown>
-) {
-  const newLog: AuditLog = {
-    id: `aud-${Date.now()}`,
-    action,
-    entity_type,
-    entity_id: entity_id || undefined,
-    change_summary,
-    created_at: new Date().toISOString(),
-    actor_email: 'admin@greenfieldcollege.edu',
-  };
-  mockAuditLogs.unshift(newLog);
-  return newLog;
+): Promise<AuditLog | null> {
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .insert({
+        action,
+        entity_type,
+        entity_id: entity_id || null,
+        change_summary,
+      })
+      .select('*')
+      .single();
+
+    if (error || !data) return null;
+    return {
+      ...(data as AuditLog),
+      actor_email: 'admin@greenfieldcollege.edu',
+    };
+  } catch {
+    return null;
+  }
 }
 
-export async function getAdminAuditLogs() {
-  return [...mockAuditLogs];
+export async function getAdminAuditLogs(limit: number = 50): Promise<AuditLog[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('audit_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error || !data) {
+    return [];
+  }
+
+  return (data as AuditLog[]).map((log) => ({
+    ...log,
+    actor_email: log.actor_email || 'admin@greenfieldcollege.edu',
+  }));
 }
 
 export async function getAdminStaff(): Promise<StaffRecord[]> {
-  let list = [...getStoreStaff()];
+  const supabase = createAdminClient();
 
-  // Also check cookie registry for dynamically added teachers
-  try {
-    const { cookies } = await import('next/headers');
-    const cookieStore = await cookies();
-    const regCookie = cookieStore.get('registered_teachers_registry');
-    if (regCookie?.value) {
-      const dynamicList = JSON.parse(regCookie.value);
-      for (const t of dynamicList) {
-        if (!list.some(item => item.email.toLowerCase() === t.email.toLowerCase())) {
-          list.push({
-            id: t.id,
-            email: t.email,
-            display_name: t.display_name,
-            role: 'teacher',
-            department: t.department || `Class Teacher (${t.assigned_class || 'Class'})`,
-            assigned_subject: t.assigned_subject || 'General Curriculum',
-            assigned_class: t.assigned_class || 'All Classes',
-            created_at: t.created_at || new Date().toISOString(),
-            status: 'active',
-          });
-        }
-      }
-    }
-  } catch {}
+  const [{ data: profiles, error }, { data: authUsersData }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('*')
+      .in('role', ['teacher', 'administrator'])
+      .order('created_at', { ascending: true }),
+    supabase.auth.admin.listUsers({ perPage: 1000 }),
+  ]);
 
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('role', ['teacher', 'administrator'])
-        .order('created_at', { ascending: true });
-
-      if (!error && data && data.length > 0) {
-        for (const p of data) {
-          if (!list.some(item => item.id === p.id || item.email.toLowerCase() === p.email?.toLowerCase())) {
-            list.push({
-              id: p.id,
-              email: p.email || '',
-              display_name: p.display_name,
-              role: p.role as 'administrator' | 'teacher',
-              department: p.role === 'administrator' ? 'Administration' : 'Academic Faculty',
-              assigned_subject: 'General Curriculum',
-              assigned_class: 'All Classes',
-              created_at: p.created_at || new Date().toISOString(),
-              status: 'active',
-            });
-          }
-        }
-      }
-    } catch {}
+  if (error) {
+    throw new Error(`Failed to load staff profiles: ${error.message}`);
   }
 
-  return list;
+  const authMap = new Map<string, any>();
+  for (const u of authUsersData?.users || []) {
+    authMap.set(u.id, u);
+  }
+
+  return ((profiles as any[]) || []).map((p) => {
+    const authUser = authMap.get(p.id);
+    const meta = authUser?.user_metadata || {};
+    const emailLower = (p.email || authUser?.email || '').toLowerCase();
+    const fallbackMeta = DEFAULT_TEACHER_METADATA[emailLower];
+
+    const isAdmin = p.role === 'administrator';
+    return {
+      id: p.id,
+      email: p.email || authUser?.email || '',
+      display_name: p.display_name || meta.display_name || 'Staff Member',
+      role: p.role as 'administrator' | 'teacher',
+      department:
+        meta.department ||
+        fallbackMeta?.department ||
+        (isAdmin ? 'Executive Governance' : 'Academic Faculty'),
+      assigned_subject:
+        meta.assigned_subject ||
+        fallbackMeta?.assigned_subject ||
+        'General Curriculum',
+      assigned_class:
+        meta.assigned_class ||
+        fallbackMeta?.assigned_class ||
+        (isAdmin ? 'All Classes' : 'JSS 1A'),
+      created_at: p.created_at || new Date().toISOString(),
+      status: 'active',
+    };
+  });
 }
 
 export async function addAdminTeacher(data: {
@@ -636,25 +920,107 @@ export async function addAdminTeacher(data: {
   assigned_class?: string;
   password?: string;
 }): Promise<StaffRecord> {
+  const supabase = createAdminClient();
   const normalizedEmail = data.email.toLowerCase().trim();
-  const newId = `t-${Date.now()}`;
+  const displayName = data.full_name.trim();
+  const department =
+    data.department.trim() ||
+    `Class Teacher (${data.assigned_class || 'JSS 1A'})`;
+  const assignedSubject = data.assigned_subject?.trim() || 'General Curriculum';
+  const assignedClass = data.assigned_class?.trim() || 'JSS 1A';
+  const teacherPassword = data.password || 'Teacher@2026';
+
+  let userId: string | null = null;
+
+  // Check if profile or auth user already exists for this email
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .ilike('email', normalizedEmail)
+    .maybeSingle();
+
+  if (existingProfile?.id) {
+    userId = existingProfile.id;
+  } else {
+    const { data: usersList } = await supabase.auth.admin.listUsers({
+      perPage: 1000,
+    });
+    const matched = usersList?.users?.find(
+      (u) => u.email?.toLowerCase() === normalizedEmail
+    );
+    if (matched) {
+      userId = matched.id;
+    }
+  }
+
+  if (userId) {
+    const { error: updateAuthErr } = await supabase.auth.admin.updateUserById(
+      userId,
+      {
+        email: normalizedEmail,
+        password: teacherPassword,
+        email_confirm: true,
+        user_metadata: {
+          display_name: displayName,
+          role: 'teacher',
+          department,
+          assigned_class: assignedClass,
+          assigned_subject: assignedSubject,
+        },
+      }
+    );
+    if (updateAuthErr) {
+      throw new Error(`Failed to update teacher auth account: ${updateAuthErr.message}`);
+    }
+  } else {
+    const { data: createdAuth, error: createAuthErr } =
+      await supabase.auth.admin.createUser({
+        email: normalizedEmail,
+        password: teacherPassword,
+        email_confirm: true,
+        user_metadata: {
+          display_name: displayName,
+          role: 'teacher',
+          department,
+          assigned_class: assignedClass,
+          assigned_subject: assignedSubject,
+        },
+      });
+
+    if (createAuthErr || !createdAuth.user) {
+      throw new Error(
+        createAuthErr?.message || 'Failed to create teacher auth account.'
+      );
+    }
+    userId = createdAuth.user.id;
+  }
+
+  const nowIso = new Date().toISOString();
+  const { error: profileErr } = await supabase.from('profiles').upsert({
+    id: userId,
+    role: 'teacher',
+    display_name: displayName,
+    email: normalizedEmail,
+    updated_at: nowIso,
+  });
+
+  if (profileErr) {
+    throw new Error(`Failed to save teacher profile: ${profileErr.message}`);
+  }
 
   const newStaff: StaffRecord = {
-    id: newId,
+    id: userId,
     email: normalizedEmail,
-    display_name: data.full_name.trim(),
+    display_name: displayName,
     role: 'teacher',
-    department: data.department.trim(),
-    assigned_subject: data.assigned_subject || 'General Curriculum',
-    assigned_class: data.assigned_class || 'JSS 1A',
-    password: data.password,
-    created_at: new Date().toISOString(),
+    department,
+    assigned_subject: assignedSubject,
+    assigned_class: assignedClass,
+    created_at: nowIso,
     status: 'active',
   };
 
-  saveStoreStaff(newStaff);
-
-  recordAuditLog('REGISTER_TEACHER', 'staff', newStaff.id, {
+  await recordAuditLog('REGISTER_TEACHER', 'staff', newStaff.id, {
     teacher_name: newStaff.display_name,
     email: newStaff.email,
     department: newStaff.department,
@@ -662,149 +1028,202 @@ export async function addAdminTeacher(data: {
     role: 'teacher',
   });
 
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase.from('profiles').upsert({
-        id: newStaff.id,
-        role: 'teacher',
-        display_name: newStaff.display_name,
-        email: newStaff.email,
-        created_at: newStaff.created_at,
-        updated_at: newStaff.created_at,
-      });
-    } catch {}
-  }
-
   return newStaff;
 }
 
-export async function deleteAdminStudent(studentIdOrId: string): Promise<boolean> {
-  const student = findStoreStudent(studentIdOrId);
-  const success = deleteStoreStudent(studentIdOrId);
-
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase
-        .from('students')
-        .delete()
-        .or(`id.eq.${studentIdOrId},student_id.eq.${studentIdOrId.toUpperCase()}`);
-    } catch {}
+export async function deleteAdminStudent(
+  studentIdOrId: string
+): Promise<boolean> {
+  const supabase = createAdminClient();
+  const student = await getAdminStudentById(studentIdOrId);
+  if (!student) {
+    return false;
   }
 
-  recordAuditLog('DELETE_STUDENT', 'students', studentIdOrId, {
-    student_id: student?.student_id || studentIdOrId,
-    name: student ? `${student.first_name} ${student.last_name}` : 'Unknown',
+  const { error } = await supabase
+    .from('students')
+    .delete()
+    .eq('id', student.id);
+
+  if (error) {
+    throw new Error(`Failed to delete student: ${error.message}`);
+  }
+
+  if (student.user_id) {
+    try {
+      await supabase.from('profiles').delete().eq('id', student.user_id);
+      await supabase.auth.admin.deleteUser(student.user_id);
+    } catch {
+      // Auth user may already be removed
+    }
+  }
+
+  await recordAuditLog('DELETE_STUDENT', 'students', student.id, {
+    student_id: student.student_id,
+    name: `${student.first_name} ${student.last_name}`,
   });
 
-  return success;
+  return true;
 }
 
 export async function deleteAdminSubject(subjectId: string): Promise<boolean> {
-  const subjects = getStoreSubjects();
-  const subject = subjects.find(s => s.id === subjectId || s.code.toLowerCase() === subjectId.toLowerCase());
-  const success = deleteStoreSubject(subjectId);
+  const supabase = createAdminClient();
+  const trimmed = subjectId.trim();
 
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase.from('subjects').delete().eq('id', subjectId);
-    } catch {}
+  let query = supabase.from('subjects').select('*');
+  if (isUuid(trimmed)) {
+    query = query.eq('id', trimmed);
+  } else {
+    query = query.ilike('code', trimmed);
   }
 
-  recordAuditLog('DELETE_SUBJECT', 'subjects', subjectId, {
-    name: subject?.name,
-    code: subject?.code,
+  const { data: subject } = await query.maybeSingle();
+  if (!subject) {
+    return false;
+  }
+
+  // Delete dependent results and class_subjects first (results.subject_id has ON DELETE RESTRICT)
+  await supabase.from('results').delete().eq('subject_id', subject.id);
+  await supabase.from('class_subjects').delete().eq('subject_id', subject.id);
+
+  const { error } = await supabase
+    .from('subjects')
+    .delete()
+    .eq('id', subject.id);
+
+  if (error) {
+    throw new Error(`Failed to delete subject: ${error.message}`);
+  }
+
+  await recordAuditLog('DELETE_SUBJECT', 'subjects', subject.id, {
+    name: subject.name,
+    code: subject.code,
   });
 
-  return success;
+  return true;
 }
 
 export async function deleteAdminStaff(staffId: string): Promise<boolean> {
-  const staffList = getStoreStaff();
-  const member = staffList.find(s => s.id === staffId || s.email.toLowerCase() === staffId.toLowerCase());
+  const supabase = createAdminClient();
+  const trimmed = staffId.trim();
 
-  // Protect administrator account from accidental self-deletion
+  if (trimmed.toLowerCase() === 'admin@greenfieldcollege.edu') {
+    throw new Error(
+      'Administrative governance policy prevents deleting the primary Administrator account.'
+    );
+  }
+
+  let query = supabase.from('profiles').select('*');
+  if (isUuid(trimmed)) {
+    query = query.eq('id', trimmed);
+  } else {
+    query = query.ilike('email', trimmed);
+  }
+
+  const { data: member } = await query.maybeSingle();
+
   if (member?.role === 'administrator') {
-    throw new Error('Administrative governance policy prevents deleting the primary Administrator account.');
+    throw new Error(
+      'Administrative governance policy prevents deleting the primary Administrator account.'
+    );
   }
 
-  const success = deleteStoreStaff(staffId);
+  if (!member) {
+    return false;
+  }
 
-  // Also remove from registered_teachers_registry cookie if present
+  const { error: profErr } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('id', member.id);
+
+  if (profErr) {
+    throw new Error(`Failed to delete staff profile: ${profErr.message}`);
+  }
+
   try {
-    const { cookies } = await import('next/headers');
-    const cookieStore = await cookies();
-    const regCookie = cookieStore.get('registered_teachers_registry');
-    if (regCookie?.value) {
-      let dynamicList = JSON.parse(regCookie.value);
-      dynamicList = dynamicList.filter(
-        (t: any) => t.id !== staffId && t.email.toLowerCase() !== staffId.toLowerCase()
-      );
-      cookieStore.set('registered_teachers_registry', JSON.stringify(dynamicList), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24 * 30,
-        path: '/',
-      });
-    }
-  } catch {}
-
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase.from('profiles').delete().eq('id', staffId);
-    } catch {}
+    await supabase.auth.admin.deleteUser(member.id);
+  } catch {
+    // Auth user may already be removed
   }
 
-  recordAuditLog('DELETE_STAFF', 'staff', staffId, {
-    name: member?.display_name,
-    email: member?.email,
-    role: member?.role,
+  await recordAuditLog('DELETE_STAFF', 'staff', member.id, {
+    name: member.display_name,
+    email: member.email,
+    role: member.role,
   });
 
-  return success;
+  return true;
 }
 
 export async function deleteAdminClass(classId: string): Promise<boolean> {
-  const classes = getStoreClasses();
-  const cls = classes.find(c => c.id === classId || c.name.toLowerCase() === classId.toLowerCase());
-  const success = deleteStoreClass(classId);
+  const supabase = createAdminClient();
+  const trimmed = classId.trim();
 
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase.from('classes').delete().eq('id', classId);
-    } catch {}
+  let query = supabase.from('classes').select('*');
+  if (isUuid(trimmed)) {
+    query = query.eq('id', trimmed);
+  } else {
+    query = query.ilike('name', trimmed);
   }
 
-  recordAuditLog('DELETE_CLASS', 'classes', classId, {
-    name: cls?.name,
-    level: cls?.level,
+  const { data: cls } = await query.maybeSingle();
+  if (!cls) {
+    return false;
+  }
+
+  // Remove or unlink dependent rows (results.class_id has ON DELETE RESTRICT)
+  await supabase.from('results').delete().eq('class_id', cls.id);
+  await supabase.from('class_subjects').delete().eq('class_id', cls.id);
+  await supabase
+    .from('students')
+    .update({ class_id: null })
+    .eq('class_id', cls.id);
+
+  const { error } = await supabase.from('classes').delete().eq('id', cls.id);
+  if (error) {
+    throw new Error(`Failed to delete class: ${error.message}`);
+  }
+
+  await recordAuditLog('DELETE_CLASS', 'classes', cls.id, {
+    name: cls.name,
+    level: cls.level,
   });
 
-  return success;
+  return true;
 }
 
 export async function deleteAdminResult(resultId: string): Promise<boolean> {
-  const results = getStoreResults();
-  const result = results.find(r => r.id === resultId);
-  const success = deleteStoreResult(resultId);
-
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient();
-      await supabase.from('results').delete().eq('id', resultId);
-    } catch {}
+  const supabase = createAdminClient();
+  const trimmed = resultId.trim();
+  if (!isUuid(trimmed)) {
+    return false;
   }
 
-  recordAuditLog('DELETE_RESULT', 'results', resultId, {
-    student_id: result?.student_id,
-    subject_id: result?.subject_id,
-    term_id: result?.term_id,
+  const { data: existing } = await supabase
+    .from('results')
+    .select('id, student_id, subject_id, term_id')
+    .eq('id', trimmed)
+    .maybeSingle();
+
+  if (!existing) {
+    return false;
+  }
+
+  const { error } = await supabase
+    .from('results')
+    .delete()
+    .eq('id', existing.id);
+
+  if (error) {
+    throw new Error(`Failed to delete result: ${error.message}`);
+  }
+
+  await recordAuditLog('DELETE_RESULT', 'results', existing.id, {
+    student_id: existing.student_id,
+    subject_id: existing.subject_id,
+    term_id: existing.term_id,
   });
 
-  return success;
+  return true;
 }
-

@@ -1,8 +1,8 @@
 'use server';
 
 import { z } from 'zod';
-import { addAdminStudent } from '@/lib/admin/admin-service';
-import { redirect } from 'next/navigation';
+import { addAdminStudent, deleteAdminStudent } from '@/lib/admin/admin-service';
+import { revalidatePath } from 'next/cache';
 
 const studentSchema = z.object({
   student_id: z.string().min(3, 'Student ID must be at least 3 characters'),
@@ -11,6 +11,11 @@ const studentSchema = z.object({
   other_names: z.string().optional(),
   class_id: z.string().min(1, 'Please select an assigned class'),
   admission_date: z.string().optional(),
+  password: z
+    .string()
+    .min(6, 'Portal password must be at least 6 characters')
+    .optional()
+    .or(z.literal('')),
 });
 
 export type AdminStudentActionState = {
@@ -30,6 +35,7 @@ export async function createStudentAction(
     other_names: (formData.get('other_names') as string)?.trim(),
     class_id: formData.get('class_id') as string,
     admission_date: (formData.get('admission_date') as string) || undefined,
+    password: ((formData.get('password') as string) || '').trim(),
   };
 
   const parsed = studentSchema.safeParse(rawData);
@@ -42,16 +48,24 @@ export async function createStudentAction(
   }
 
   try {
-    await addAdminStudent(parsed.data);
-    const { revalidatePath } = await import('next/cache');
+    const portalPassword = parsed.data.password || 'Student@2026';
+    const created = await addAdminStudent({
+      ...parsed.data,
+      password: portalPassword,
+    });
+
     revalidatePath('/admin/students');
+    revalidatePath('/admin/results/entry');
+    revalidatePath('/admin/classes');
     revalidatePath('/admin');
+
     return {
       success: true,
-      message: `Student ${parsed.data.student_id} successfully created.`,
+      message: `Student ${created.first_name} ${created.last_name} (${created.student_id}) created in Supabase. Portal Login ID: ${created.student_id} | Password: ${portalPassword}`,
     };
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Failed to create student';
+    const errorMsg =
+      err instanceof Error ? err.message : 'Failed to create student';
     return {
       success: false,
       message: errorMsg,
@@ -59,32 +73,35 @@ export async function createStudentAction(
   }
 }
 
-export async function deleteStudentAction(studentId: string): Promise<{ success: boolean; message: string }> {
+export async function deleteStudentAction(
+  studentId: string
+): Promise<{ success: boolean; message: string }> {
   const { getAuthenticatedStaff } = await import('@/app/actions/admin-auth');
   const staff = await getAuthenticatedStaff();
   if (staff?.role !== 'administrator') {
     return {
       success: false,
-      message: 'Access denied: Only School Administrators can delete student accounts.',
+      message:
+        'Access denied: Only School Administrators can delete student accounts.',
     };
   }
 
   try {
-    const { deleteAdminStudent } = await import('@/lib/admin/admin-service');
     await deleteAdminStudent(studentId);
-    const { revalidatePath } = await import('next/cache');
     revalidatePath('/admin/students');
+    revalidatePath('/admin/results/entry');
+    revalidatePath('/admin/classes');
     revalidatePath('/admin');
     revalidatePath('/admin/results');
     return {
       success: true,
-      message: `Student account ${studentId} has been successfully deleted.`,
+      message: `Student account ${studentId} has been permanently deleted.`,
     };
   } catch (err: unknown) {
     return {
       success: false,
-      message: err instanceof Error ? err.message : 'Failed to delete student',
+      message:
+        err instanceof Error ? err.message : 'Failed to delete student',
     };
   }
 }
-

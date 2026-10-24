@@ -146,6 +146,7 @@ export default async function StudentDashboardPage() {
                 <thead className="bg-slate-50 text-gray-600 text-xs uppercase border-b border-gray-200">
                   <tr>
                     <th className="py-3 px-4">Subject</th>
+                    <th className="py-3 px-4">Term</th>
                     <th className="py-3 px-4 text-center">Score</th>
                     <th className="py-3 px-4 text-center">Grade</th>
                     <th className="py-3 px-4 text-center">Remark</th>
@@ -155,7 +156,7 @@ export default async function StudentDashboardPage() {
                 <tbody className="divide-y divide-gray-100 font-medium">
                   {dashboardData.recentResults.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-gray-500 text-xs">
+                      <td colSpan={6} className="py-8 text-center text-gray-500 text-xs">
                         No examination results published for your portal account yet.
                       </td>
                     </tr>
@@ -164,6 +165,9 @@ export default async function StudentDashboardPage() {
                       <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-3.5 px-4 text-gray-900">
                           {item.subject?.name || 'Subject'}
+                        </td>
+                        <td className="py-3.5 px-4 text-xs text-gray-600">
+                          {item.term?.name || activeTermName}
                         </td>
                         <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-800">
                           {item.total_score}

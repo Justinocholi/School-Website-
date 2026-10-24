@@ -291,14 +291,19 @@ export async function executeStudentImport(
         other_names: row.other_names,
         class_id: assignedClass?.id,
         admission_date: row.admission_date,
+        updateIfExists: mode === 'update_existing',
       });
-      created++;
+      if (mode === 'update_existing') {
+        updated++;
+      } else {
+        created++;
+      }
     } catch {
       failed++;
     }
   }
 
-  recordAuditLog('BULK_IMPORT_STUDENTS', 'import_jobs', null, {
+  await recordAuditLog('BULK_IMPORT_STUDENTS', 'import_jobs', null, {
     total: validRows.length,
     created,
     updated,

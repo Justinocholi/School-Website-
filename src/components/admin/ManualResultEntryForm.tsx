@@ -2,13 +2,21 @@
 
 import React, { useState, useActionState } from 'react';
 import { saveSingleResultAction } from '@/app/actions/admin-results';
-import { StudentRecord, ClassRecord, SubjectRecord, TermRecord } from '@/types/database.types';
-import { evaluateGrade, calculateTotalScore } from '@/lib/grading/grading-engine';
+import {
+  StudentRecord,
+  ClassRecord,
+  SubjectRecord,
+  TermRecord,
+} from '@/types/database.types';
+import {
+  evaluateGrade,
+  calculateTotalScore,
+} from '@/lib/grading/grading-engine';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { PenTool, CheckCircle2 } from 'lucide-react';
+import { PenTool } from 'lucide-react';
 
 interface ManualResultEntryFormProps {
   students: StudentRecord[];
@@ -28,19 +36,51 @@ export function ManualResultEntryForm({
   assignedClass,
 }: ManualResultEntryFormProps) {
   const isTeacher = userRole === 'teacher';
-  const [state, formAction, isPending] = useActionState(saveSingleResultAction, null);
-
-  const [caScore, setCaScore] = useState<number>(25);
-  const [examScore, setExamScore] = useState<number>(60);
+  const [state, formAction, isPending] = useActionState(
+    saveSingleResultAction,
+    null
+  );
 
   // If teacher has assigned class, filter students strictly to their class
   const teacherClassObj = assignedClass
-    ? classes.find((c) => c.name.toLowerCase() === assignedClass.toLowerCase()) || classes[0]
+    ? classes.find(
+        (c) => c.name.toLowerCase() === assignedClass.toLowerCase()
+      ) || classes[0]
     : undefined;
 
   const scopedStudents = assignedClass
-    ? students.filter((s) => s.class?.name.toLowerCase() === assignedClass.toLowerCase() || s.class_id === teacherClassObj?.id)
+    ? students.filter(
+        (s) =>
+          s.class?.name?.toLowerCase() === assignedClass.toLowerCase() ||
+          s.class_id === teacherClassObj?.id
+      )
     : students;
+
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(
+    scopedStudents[0]?.student_id || ''
+  );
+  const [selectedClassId, setSelectedClassId] = useState<string>(
+    scopedStudents[0]?.class_id ||
+      scopedStudents[0]?.class?.id ||
+      classes[0]?.id ||
+      ''
+  );
+  const [caScore, setCaScore] = useState<number>(25);
+  const [examScore, setExamScore] = useState<number>(60);
+
+  const handleStudentChange = (newStudentId: string) => {
+    setSelectedStudentId(newStudentId);
+    const matchedStudent = scopedStudents.find(
+      (s) => s.student_id === newStudentId || s.id === newStudentId
+    );
+    if (matchedStudent) {
+      const studentClassId =
+        matchedStudent.class_id || matchedStudent.class?.id;
+      if (studentClassId) {
+        setSelectedClassId(studentClassId);
+      }
+    }
+  };
 
   const total = calculateTotalScore([caScore, examScore]);
   const gradeEval = evaluateGrade(total);
@@ -51,9 +91,14 @@ export function ManualResultEntryForm({
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between text-xs text-emerald-950">
           <div className="flex items-center gap-2">
             <span className="font-bold">Form Teacher Scope:</span>
-            <span>Recording marks solely for students in <strong className="text-emerald-900">{assignedClass}</strong>.</span>
+            <span>
+              Recording marks solely for students in{' '}
+              <strong className="text-emerald-900">{assignedClass}</strong>.
+            </span>
           </div>
-          <Badge variant="info" className="text-[10px]">Class Locked</Badge>
+          <Badge variant="info" className="text-[10px]">
+            Class Locked
+          </Badge>
         </div>
       )}
 
@@ -70,20 +115,25 @@ export function ManualResultEntryForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-gray-700">
-            Student {assignedClass ? `(${assignedClass})` : ''} <span className="text-rose-500">*</span>
+            Student {assignedClass ? `(${assignedClass})` : ''}{' '}
+            <span className="text-rose-500">*</span>
           </label>
           <select
             name="student_id"
             required
-            defaultValue={scopedStudents[0]?.student_id || ''}
+            value={selectedStudentId}
+            onChange={(e) => handleStudentChange(e.target.value)}
             className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-medium"
           >
             {scopedStudents.length === 0 ? (
-              <option value="">No scholars enrolled in {assignedClass || 'this class'}</option>
+              <option value="">
+                No scholars enrolled in {assignedClass || 'this class'}
+              </option>
             ) : (
               scopedStudents.map((s) => (
                 <option key={s.id} value={s.student_id}>
-                  {s.student_id} - {s.first_name} {s.last_name} ({s.class?.name || assignedClass || 'Class'})
+                  {s.student_id} - {s.first_name} {s.last_name} (
+                  {s.class?.name || assignedClass || 'Class'})
                 </option>
               ))
             )}
@@ -118,15 +168,20 @@ export function ManualResultEntryForm({
             <div>
               <input type="hidden" name="class_id" value={teacherClassObj.id} />
               <div className="flex h-10 w-full items-center justify-between rounded-lg border border-gray-300 bg-slate-100 px-3 py-2 text-xs font-bold text-gray-700">
-                <span>{assignedClass} ({teacherClassObj.level})</span>
-                <Badge variant="outline" className="text-[10px]">Your Form Class</Badge>
+                <span>
+                  {assignedClass} ({teacherClassObj.level})
+                </span>
+                <Badge variant="outline" className="text-[10px]">
+                  Your Form Class
+                </Badge>
               </div>
             </div>
           ) : (
             <select
               name="class_id"
               required
-              defaultValue={classes[0]?.id || ''}
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
               className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-medium"
             >
               {classes.map((c) => (
@@ -145,7 +200,9 @@ export function ManualResultEntryForm({
           <select
             name="term_id"
             required
-            defaultValue={terms.find((t) => t.is_active)?.id || terms[0]?.id || ''}
+            defaultValue={
+              terms.find((t) => t.is_active)?.id || terms[0]?.id || ''
+            }
             className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent font-medium"
           >
             {terms.map((t) => (
@@ -166,7 +223,8 @@ export function ManualResultEntryForm({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-gray-700">
-              Continuous Assessment (Max: 30) <span className="text-rose-500">*</span>
+              Continuous Assessment (Max: 30){' '}
+              <span className="text-rose-500">*</span>
             </label>
             <Input
               name="ca_score"
@@ -183,7 +241,8 @@ export function ManualResultEntryForm({
 
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-gray-700">
-              Examination Score (Max: 70) <span className="text-rose-500">*</span>
+              Examination Score (Max: 70){' '}
+              <span className="text-rose-500">*</span>
             </label>
             <Input
               name="exam_score"
@@ -204,31 +263,50 @@ export function ManualResultEntryForm({
           <div className="flex items-center gap-4 text-xs font-medium">
             <div>
               <span className="text-gray-500 block">Total Score:</span>
-              <span className="text-xl font-bold font-mono text-emerald-800">{total} / 100</span>
+              <span className="text-xl font-bold font-mono text-emerald-800">
+                {total} / 100
+              </span>
             </div>
             <div>
               <span className="text-gray-500 block">Computed Grade:</span>
-              <Badge variant={gradeEval.grade === 'A' ? 'success' : gradeEval.grade === 'B' ? 'info' : 'warning'} className="text-sm font-bold">
+              <Badge
+                variant={
+                  gradeEval.grade === 'A'
+                    ? 'success'
+                    : gradeEval.grade === 'B'
+                      ? 'info'
+                      : 'warning'
+                }
+                className="text-sm font-bold"
+              >
                 {gradeEval.grade}
               </Badge>
             </div>
             <div>
               <span className="text-gray-500 block">Remark:</span>
-              <span className="font-semibold text-gray-900">{gradeEval.remark}</span>
+              <span className="font-semibold text-gray-900">
+                {gradeEval.remark}
+              </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold text-gray-700">Workflow Status:</label>
+            <label className="text-xs font-semibold text-gray-700">
+              Workflow Status:
+            </label>
             <select
               name="status"
               defaultValue={isTeacher ? 'pending_review' : 'published'}
               className="h-9 rounded-md border border-gray-300 bg-white px-2.5 text-xs font-semibold text-emerald-800"
             >
               {!isTeacher && (
-                <option value="published">Publish Immediately (Visible to Student)</option>
+                <option value="published">
+                  Publish Immediately (Visible to Student)
+                </option>
               )}
-              <option value="pending_review">Submit for Review (Pending Admin Approval)</option>
+              <option value="pending_review">
+                Submit for Review (Pending Admin Approval)
+              </option>
               <option value="draft">Save as Draft (Private)</option>
             </select>
           </div>

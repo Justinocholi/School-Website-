@@ -5,7 +5,10 @@ import {
   saveSingleResult,
   publishResultBatch,
   recordAuditLog,
+  deleteAdminResult,
 } from '@/lib/admin/admin-service';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { evaluateGrade } from '@/lib/grading/grading-engine';
 import { getAuthenticatedStaff } from '@/app/actions/admin-auth';
 import { revalidatePath } from 'next/cache';
 
@@ -14,12 +17,21 @@ const singleResultSchema = z.object({
   subject_id: z.string().min(1, 'Subject is required'),
   class_id: z.string().min(1, 'Class is required'),
   term_id: z.string().min(1, 'Term is required'),
-  ca_score: z.coerce.number().min(0, 'CA cannot be negative').max(30, 'CA max score is 30'),
-  exam_score: z.coerce.number().min(0, 'Exam cannot be negative').max(70, 'Exam max score is 70'),
+  ca_score: z.coerce
+    .number()
+    .min(0, 'CA cannot be negative')
+    .max(30, 'CA max score is 30'),
+  exam_score: z.coerce
+    .number()
+    .min(0, 'Exam cannot be negative')
+    .max(70, 'Exam max score is 70'),
   status: z.enum(['draft', 'pending_review', 'published']),
 });
 
-export async function saveSingleResultAction(prevState: unknown, formData: FormData) {
+export async function saveSingleResultAction(
+  prevState: unknown,
+  formData: FormData
+) {
   const staff = await getAuthenticatedStaff();
   const rawData = {
     student_id: formData.get('student_id') as string,
@@ -46,13 +58,14 @@ export async function saveSingleResultAction(prevState: unknown, formData: FormD
 
   try {
     const record = await saveSingleResult(parsed.data);
+    revalidatePath('/admin');
     revalidatePath('/admin/results');
     revalidatePath('/admin/results/review');
     revalidatePath('/student/results');
     revalidatePath('/student');
     return {
       success: true,
-      message: `Result for student ${parsed.data.student_id} saved successfully (${record.total_score} - Grade ${record.grade})${staff?.role === 'teacher' ? ' and submitted for Administrator review' : ''}.`,
+      message: `Result for ${record.student?.first_name || ''} ${record.student?.last_name || ''} (${record.student?.student_id || parsed.data.student_id}) saved successfully (${record.total_score} - Grade ${record.grade})${staff?.role === 'teacher' ? ' and submitted for Administrator review' : ''}.`,
     };
   } catch (err: unknown) {
     return {
@@ -67,7 +80,8 @@ export async function publishResultsAction(resultIds: string[], reason: string) 
   if (staff?.role !== 'administrator') {
     return {
       success: false,
-      message: 'Access denied: Only School Administrators can authorize and publish examination results.',
+      message:
+        'Access denied: Only School Administrators can authorize and publish examination results.',
     };
   }
 
@@ -76,9 +90,14 @@ export async function publishResultsAction(resultIds: string[], reason: string) 
   }
 
   try {
-    const res = await publishResultBatch(resultIds, reason || 'Standard terminal publication approved');
+    const res = await publishResultBatch(
+      resultIds,
+      reason || 'Standard terminal publication approved'
+    );
+    revalidatePath('/admin');
     revalidatePath('/admin/results');
     revalidatePath('/admin/results/review');
+    revalidatePath('/student');
     revalidatePath('/student/results');
     return {
       success: true,
@@ -102,24 +121,66 @@ export async function correctPublishedResultAction(
   if (staff?.role !== 'administrator') {
     return {
       success: false,
-      message: 'Access denied: Modifying published results requires School Administrator privileges.',
+      message:
+        'Access denied: Modifying published results requires School Administrator privileges.',
     };
   }
 
   if (!reason || reason.trim().length < 5) {
-    return { success: false, message: 'A verified administrative audit reason is required to correct published marks.' };
+    return {
+      success: false,
+      message:
+        'A verified administrative audit reason is required to correct published marks.',
+    };
   }
 
   try {
-    // Audit before modifying
-    recordAuditLog('CORRECT_PUBLISHED_RESULT', 'results', resultId, {
+    const supabase = createAdminClient();
+    const total = Number(caScore) + Number(examScore);
+    const evalResult = evaluateGrade(total);
+
+    const { error: updateErr } = await supabase
+      .from('results')
+      .update({
+        total_score: total,
+        grade: evalResult.grade,
+        remarks: evalResult.remark,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', resultId);
+
+    if (updateErr) {
+      throw new Error(updateErr.message);
+    }
+
+    await supabase.from('result_scores').upsert(
+      [
+        {
+          result_id: resultId,
+          assessment_component_id: '44444444-4444-4444-4444-444444444441',
+          score: Number(caScore),
+        },
+        {
+          result_id: resultId,
+          assessment_component_id: '44444444-4444-4444-4444-444444444442',
+          score: Number(examScore),
+        },
+      ],
+      { onConflict: 'result_id,assessment_component_id' }
+    );
+
+    await recordAuditLog('CORRECT_PUBLISHED_RESULT', 'results', resultId, {
       result_id: resultId,
       new_ca: caScore,
       new_exam: examScore,
+      new_total: total,
+      new_grade: evalResult.grade,
       audit_justification: reason,
     });
 
+    revalidatePath('/admin');
     revalidatePath('/admin/results');
+    revalidatePath('/student');
     revalidatePath('/student/results');
 
     return {
@@ -134,18 +195,21 @@ export async function correctPublishedResultAction(
   }
 }
 
-export async function deleteResultAction(resultId: string): Promise<{ success: boolean; message: string }> {
+export async function deleteResultAction(
+  resultId: string
+): Promise<{ success: boolean; message: string }> {
   const staff = await getAuthenticatedStaff();
   if (staff?.role !== 'administrator') {
     return {
       success: false,
-      message: 'Access denied: Only School Administrators can delete examination results.',
+      message:
+        'Access denied: Only School Administrators can delete examination results.',
     };
   }
 
   try {
-    const { deleteAdminResult } = await import('@/lib/admin/admin-service');
     await deleteAdminResult(resultId);
+    revalidatePath('/admin');
     revalidatePath('/admin/results');
     revalidatePath('/admin/results/review');
     revalidatePath('/student/results');
@@ -161,4 +225,3 @@ export async function deleteResultAction(resultId: string): Promise<{ success: b
     };
   }
 }
-
