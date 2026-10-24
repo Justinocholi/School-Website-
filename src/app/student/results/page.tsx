@@ -208,21 +208,25 @@ export default async function StudentResultsPage({
           {/* Official Printable Report Card Container */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm print:border-none print:shadow-none print:p-0">
             {/* Report Card Header (Prominent on Print) */}
-            <div className="border-b-2 border-emerald-900 pb-6 mb-6">
+            <div className="border-b-2 border-[#003366] pb-6 mb-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-emerald-800 text-amber-400 flex items-center justify-center font-bold">
-                    <GraduationCap className="w-8 h-8" />
+                  <div className="w-14 h-14 rounded-xl bg-white p-1 border border-[#cce5ff] flex items-center justify-center shadow-xs">
+                    <img
+                      src="/assets/logo.png"
+                      alt="Teacher Home Secondary School Crest"
+                      className="w-full h-full object-contain"
+                    />
                   </div>
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-black text-gray-900 uppercase tracking-tight">
-                      Greenfield International College
+                    <h2 className="text-xl sm:text-2xl font-black text-[#003366] uppercase tracking-tight font-display">
+                      Teacher Home Secondary School
                     </h2>
-                    <p className="text-xs font-medium text-emerald-800 uppercase tracking-wider">
-                      Knowledge &bull; Integrity &bull; Excellence
+                    <p className="text-xs font-semibold text-[#990033] uppercase tracking-wider">
+                      Educate A Child &amp; Build A Virile Nation
                     </p>
                     <p className="text-[11px] text-gray-500">
-                      15 Heritage Boulevard, Victoria Island, Lagos &bull; info@greenfieldcollege.edu
+                      Peace Community, Lokoja, Kogi State &bull; info@teacherhomeschool.com
                     </p>
                   </div>
                 </div>

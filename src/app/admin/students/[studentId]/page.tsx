@@ -123,7 +123,7 @@ export default async function AdminStudentDetailPage({
               </p>
               <p className="text-[11px] text-rose-700 mt-0.5 max-w-lg leading-relaxed">
                 If {student.first_name} {student.last_name} ({student.student_id}
-                ) is no longer enrolled at Greenfield College, you can permanently erase their portal account and recorded assessments. This action cannot be undone.
+                ) is no longer enrolled at Teacher Home Secondary School, you can permanently erase their portal account and recorded assessments. This action cannot be undone.
               </p>
             </div>
             <div className="shrink-0">

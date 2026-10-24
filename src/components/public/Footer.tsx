@@ -1,137 +1,159 @@
 import React from 'react';
 import Link from 'next/link';
-import { GraduationCap, Mail, Phone, MapPin, Clock, ShieldCheck } from 'lucide-react';
 
 export function Footer() {
   return (
-    <footer className="bg-gray-900 text-gray-300 mt-auto border-t border-gray-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
-          {/* Col 1: School Identity */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-700 text-amber-400 flex items-center justify-center font-bold">
-                <GraduationCap className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="block text-lg font-bold text-white tracking-tight">
-                  Greenfield College
-                </span>
-                <span className="block text-xs font-medium text-emerald-400 tracking-wider uppercase">
-                  Excellence & Integrity
-                </span>
+    <div className="thss-site">
+      <footer className="footer">
+        <div className="container">
+          <div className="footer-grid">
+            <div className="footer-brand">
+              <Link
+                href="/"
+                className="logo"
+                style={{ color: 'var(--white)' }}
+              >
+                <div
+                  className="logo-crest"
+                  style={{
+                    background: 'linear-gradient(135deg, #fff 0%, #e2e8f0 100%)',
+                  }}
+                >
+                  <img
+                    src="/assets/logo.png"
+                    alt="Teacher Home Secondary School crest"
+                  />
+                </div>
+                <div className="logo-text">
+                  <span className="logo-name" style={{ color: 'var(--white)' }}>
+                    Teacher Home
+                  </span>
+                  <span
+                    className="logo-sub"
+                    style={{ color: 'var(--blue-accent)' }}
+                  >
+                    Secondary School
+                  </span>
+                </div>
+              </Link>
+              <p>
+                Building capable, principled and future-ready young people
+                through excellent secondary education in Lokoja.
+              </p>
+              <div className="footer-socials">
+                <a
+                  href="https://facebook.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="footer-social"
+                >
+                  <i className="fab fa-facebook-f" />
+                </a>
+                <a
+                  href="https://instagram.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="footer-social"
+                >
+                  <i className="fab fa-instagram" />
+                </a>
+                <a
+                  href="https://wa.me/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="footer-social"
+                >
+                  <i className="fab fa-whatsapp" />
+                </a>
               </div>
             </div>
-            <p className="text-sm text-gray-400 leading-relaxed">
-              Nurturing intellectual curiosity, moral character, and academic excellence in an inclusive and inspiring learning environment.
-            </p>
-            <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-3 py-1.5 rounded-md w-fit">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Accredited Educational Institution</span>
+            <div>
+              <div className="footer-title">Explore</div>
+              <div className="footer-links">
+                <Link href="/#about" className="footer-link">
+                  About Us
+                </Link>
+                <Link href="/#academics" className="footer-link">
+                  Academics
+                </Link>
+                <Link href="/#facilities" className="footer-link">
+                  Facilities
+                </Link>
+                <Link href="/#management" className="footer-link">
+                  Management
+                </Link>
+              </div>
             </div>
-          </div>
-
-          {/* Col 2: Quick Links */}
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-wider text-white mb-4">
-              Quick Links
-            </h4>
-            <ul className="space-y-2.5 text-sm">
-              <li>
-                <Link href="/about" className="hover:text-emerald-400 transition-colors">
-                  About Our School
+            <div>
+              <div className="footer-title">Portals &amp; Parents</div>
+              <div className="footer-links">
+                <Link href="/#admissions" className="footer-link">
+                  Admissions
                 </Link>
-              </li>
-              <li>
-                <Link href="/academics" className="hover:text-emerald-400 transition-colors">
-                  Curriculum & Subjects
+                <Link href="/#bulletin" className="footer-link">
+                  School Bulletin
                 </Link>
-              </li>
-              <li>
-                <Link href="/admissions" className="hover:text-emerald-400 transition-colors">
-                  Admissions Process
+                <a
+                  href="/student-login"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="footer-link"
+                >
+                  Student &amp; Parents Portal
+                </a>
+                <a
+                  href="/admin-login"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="footer-link"
+                >
+                  Staff Portal
+                </a>
+                <Link href="/#contact" className="footer-link">
+                  Schedule a Visit
                 </Link>
-              </li>
-              <li>
-                <Link href="/news" className="hover:text-emerald-400 transition-colors">
-                  News & Announcements
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="hover:text-emerald-400 transition-colors">
-                  Contact & Campus Tour
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Col 3: Academic Portals */}
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-wider text-white mb-4">
-              Online Portals
-            </h4>
-            <ul className="space-y-2.5 text-sm">
-              <li>
-                <Link href="/student-login" className="text-amber-400 hover:text-amber-300 font-medium transition-colors flex items-center gap-1.5">
-                  <span>→</span> Student Result Checker
-                </Link>
-              </li>
-              <li>
-                <Link href="/student" className="hover:text-emerald-400 transition-colors">
-                  Student Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link href="/admin" className="hover:text-emerald-400 transition-colors">
-                  Staff & Administrator Portal
-                </Link>
-              </li>
-              <li>
-                <Link href="/admissions#enquiry" className="hover:text-emerald-400 transition-colors">
-                  Admissions Enquiry
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Col 4: Contact & Hours */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold uppercase tracking-wider text-white mb-4">
-              Contact & Hours
-            </h4>
-            <div className="space-y-2.5 text-sm text-gray-400">
-              <div className="flex items-start gap-2.5">
-                <MapPin className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                <span>15 Heritage Boulevard, Victoria Island, Lagos, Nigeria</span>
               </div>
-              <div className="flex items-center gap-2.5">
-                <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>+234 (0) 803 123 4567</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <Mail className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>info@greenfieldcollege.edu</span>
-              </div>
-              <div className="flex items-start gap-2.5 pt-1 text-xs">
-                <Clock className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                <div>
-                  <p>Mon - Fri: 7:30 AM – 4:00 PM</p>
-                  <p>Administrative Office: 8:00 AM – 3:30 PM</p>
+            </div>
+            <div>
+              <div className="footer-title">Contact</div>
+              <div className="footer-contact">
+                <div className="footer-contact-item">
+                  <i className="fas fa-map-marker-alt" />
+                  <span>
+                    Teacher Home Secondary School, Peace Community, Lokoja, Kogi
+                    State
+                  </span>
+                </div>
+                <div className="footer-contact-item">
+                  <i className="fas fa-phone" />
+                  <a href="tel:+2348031234567">+234 803 123 4567</a>
+                </div>
+                <div className="footer-contact-item">
+                  <i className="fas fa-envelope" />
+                  <a href="mailto:info@teacherhomeschool.com">
+                    info@teacherhomeschool.com
+                  </a>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
-          <p>© 2026 Greenfield International College. All rights reserved.</p>
-          <div className="flex items-center gap-6">
-            <span>Secure Student Information & Result Management System</span>
-            <span>Data Protected (NDPA Compliant)</span>
+          <div className="footer-bottom">
+            <div>
+              &copy; 2026 Teacher Home Secondary School. All rights reserved.
+            </div>
+            <div>
+              Built by{' '}
+              <a
+                href="https://delversetech.com"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Delverse Technologies Limited
+              </a>
+            </div>
           </div>
         </div>
-      </div>
-    </footer>
+      </footer>
+    </div>
   );
 }

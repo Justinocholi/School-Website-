@@ -2,7 +2,6 @@ import React from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import {
-  GraduationCap,
   LayoutDashboard,
   Users,
   FileSpreadsheet,
@@ -15,7 +14,6 @@ import {
   Send,
   History,
   Settings,
-  Shield,
   ExternalLink,
   Megaphone,
   LogOut,
@@ -56,7 +54,11 @@ export default async function AdminLayout({
         ...(isAdmin
           ? [
               { name: 'Staff & Teachers', href: '/admin/staff', icon: UserCheck },
-              { name: 'Announcements', href: '/admin/announcements', icon: Megaphone },
+              {
+                name: 'Announcements',
+                href: '/admin/announcements',
+                icon: Megaphone,
+              },
             ]
           : []),
         {
@@ -149,20 +151,24 @@ export default async function AdminLayout({
       : 'TC';
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row selection:bg-emerald-200">
+    <div className="min-h-screen bg-[#f4f9fe] flex flex-col md:flex-row selection:bg-[#cce5ff]">
       {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 border-r border-slate-800">
-        <div className="p-5 border-b border-slate-800 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-700 text-amber-400 flex items-center justify-center font-bold shadow-sm">
-            <Shield className="w-5 h-5" />
+      <aside className="w-full md:w-64 bg-[#001f3f] text-slate-200 flex flex-col shrink-0 border-r border-[#003366]">
+        <div className="p-5 border-b border-[#003366] flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-sm shrink-0">
+            <img
+              src="/assets/logo.png"
+              alt="Teacher Home Secondary School Crest"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
-            <span className="font-bold text-white text-base leading-none block">
-              {isAdmin ? 'Admin Portal' : 'Class Portal'}
+            <span className="font-bold text-white text-sm leading-tight block font-display">
+              Teacher Home
             </span>
-            <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
+            <span className="text-[10px] text-[#66b2ff] font-semibold uppercase tracking-wider block mt-0.5">
               {isAdmin
-                ? 'School Administrator'
+                ? 'Admin Portal'
                 : `Form Teacher • ${staff.assigned_class || 'Class'}`}
             </span>
           </div>
@@ -172,7 +178,7 @@ export default async function AdminLayout({
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {navSections.map((sec) => (
             <div key={sec.title} className="space-y-1">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">
+              <p className="text-[11px] font-bold text-[#66b2ff]/70 uppercase tracking-wider px-3 mb-2">
                 {sec.title}
               </p>
               {sec.items.map((item) => {
@@ -181,9 +187,9 @@ export default async function AdminLayout({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:text-white hover:bg-[#003366] transition-colors"
                   >
-                    <Icon className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <Icon className="w-4 h-4 text-[#66b2ff] shrink-0" />
                     <span>{item.name}</span>
                   </Link>
                 );
@@ -193,20 +199,22 @@ export default async function AdminLayout({
         </div>
 
         {/* Quick Links */}
-        <div className="p-4 border-t border-slate-800 text-xs space-y-2">
+        <div className="p-4 border-t border-[#003366] text-xs space-y-2">
           <Link
             href="/"
-            className="flex items-center justify-between text-slate-400 hover:text-white px-2 py-1.5 rounded transition-colors"
+            className="flex items-center justify-between text-slate-300 hover:text-white px-2 py-1.5 rounded transition-colors"
           >
-            <span>Public Website</span>
-            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Public School Website</span>
+            <ExternalLink className="w-3.5 h-3.5 text-[#66b2ff]" />
           </Link>
           <Link
             href="/student-login"
-            className="flex items-center justify-between text-slate-400 hover:text-white px-2 py-1.5 rounded transition-colors"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-between text-slate-300 hover:text-white px-2 py-1.5 rounded transition-colors"
           >
             <span>Student Result Portal</span>
-            <ExternalLink className="w-3.5 h-3.5" />
+            <ExternalLink className="w-3.5 h-3.5 text-[#66b2ff]" />
           </Link>
         </div>
       </aside>
@@ -214,13 +222,14 @@ export default async function AdminLayout({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 sticky top-0 z-20 shadow-xs">
+        <header className="bg-white border-b border-[#cce5ff] h-16 flex items-center justify-between px-6 sticky top-0 z-20 shadow-xs">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-500">
+            <span className="text-xs font-semibold text-[#003366]">
               Academic Session:
             </span>
             <Badge variant="success">
-              {activeSession?.name || '2026/2027'} ({activeTerm?.name || 'First Term'})
+              {activeSession?.name || '2026/2027'} (
+              {activeTerm?.name || 'First Term'})
             </Badge>
             <Badge
               variant={isAdmin ? 'default' : 'info'}
@@ -234,14 +243,14 @@ export default async function AdminLayout({
 
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <span className="text-xs font-bold text-gray-900 block leading-tight">
+              <span className="text-xs font-bold text-[#003366] block leading-tight">
                 {staff.display_name}
               </span>
-              <span className="text-[11px] text-gray-500 font-mono">
+              <span className="text-[11px] text-slate-500 font-mono">
                 {staff.email}
               </span>
             </div>
-            <div className="w-8 h-8 rounded-full bg-emerald-800 text-white flex items-center justify-center font-bold text-xs">
+            <div className="w-8 h-8 rounded-full bg-[#990033] text-white flex items-center justify-center font-bold text-xs shadow-xs">
               {initials}
             </div>
             <form action={logoutAdmin}>
@@ -249,7 +258,7 @@ export default async function AdminLayout({
                 type="submit"
                 variant="outline"
                 size="sm"
-                className="text-xs text-rose-700 hover:text-rose-800 hover:bg-rose-50 border-gray-200 ml-1"
+                className="text-xs text-[#990033] hover:text-[#7a0029] hover:bg-[#fdf2f5] border-[#cce5ff] ml-1"
               >
                 <LogOut className="w-3.5 h-3.5 sm:mr-1" />
                 <span className="hidden sm:inline">Sign Out</span>

@@ -143,22 +143,22 @@ export default async function AdminSettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="font-semibold text-gray-700">School Legal Name</label>
-              <Input defaultValue="Greenfield International College" readOnly className="bg-slate-50 font-medium" />
+              <Input defaultValue="Teacher Home Secondary School" readOnly className="bg-slate-50 font-medium" />
             </div>
             <div className="space-y-1">
               <label className="font-semibold text-gray-700">Institutional Motto</label>
-              <Input defaultValue="Knowledge, Integrity, and Excellence" readOnly className="bg-slate-50 font-medium" />
+              <Input defaultValue="Educate A Child & Build A Virile Nation" readOnly className="bg-slate-50 font-medium" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="font-semibold text-gray-700">Official Contact Email</label>
-              <Input defaultValue="info@greenfieldcollege.edu" readOnly className="bg-slate-50 font-medium" />
+              <Input defaultValue="info@teacherhomeschool.com" readOnly className="bg-slate-50 font-medium" />
             </div>
             <div className="space-y-1">
               <label className="font-semibold text-gray-700">Official Telephone Line</label>
-              <Input defaultValue="+234 (0) 803 123 4567" readOnly className="bg-slate-50 font-medium" />
+              <Input defaultValue="+234 803 123 4567" readOnly className="bg-slate-50 font-medium" />
             </div>
           </div>
         </CardContent>

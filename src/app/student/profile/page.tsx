@@ -24,7 +24,7 @@ export default async function StudentProfilePage() {
           Official Student Profile
         </h1>
         <p className="text-sm text-gray-600 mt-1">
-          Verified academic credentials and class enrolment status on file with Greenfield International College.
+          Verified academic credentials and class enrolment status on file with Teacher Home Secondary School, Lokoja.
         </p>
       </div>
 

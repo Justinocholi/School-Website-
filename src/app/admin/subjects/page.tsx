@@ -31,7 +31,7 @@ export default async function AdminSubjectsPage() {
         </h1>
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
           {isAdmin
-            ? 'Define subject codes, manage accredited courses, or delete unused curriculum items at Greenfield College.'
+            ? 'Define subject codes, manage accredited courses, or delete unused curriculum items at Teacher Home Secondary School.'
             : 'View curriculum subjects, course descriptions, and official subject codes.'}
         </p>
       </div>

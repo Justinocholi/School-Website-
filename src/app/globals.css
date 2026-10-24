@@ -1,9 +1,19 @@
 @import "tailwindcss";
+@import "./thss-public.css";
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
-  --font-geist-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --foreground: #1e293b;
+  --navy: #003366;
+  --navy-dark: #001f3f;
+  --navy-light: #004a99;
+  --maroon: #990033;
+  --maroon-dark: #7a0029;
+  --blue-accent: #66b2ff;
+  --blue-soft: #e9f5ff;
+  --blue-pale: #f4f9fe;
+  --cream: #faf7f2;
+  --font-geist-sans: "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
@@ -12,17 +22,45 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Remap primary theme (emerald) to Teacher Home Secondary School Navy & Soft Blue */
+  --color-emerald-50: #f4f9fe;
+  --color-emerald-100: #e9f5ff;
+  --color-emerald-200: #cce5ff;
+  --color-emerald-300: #99ccff;
+  --color-emerald-400: #66b2ff;
+  --color-emerald-500: #1a75d2;
+  --color-emerald-600: #004a99;
+  --color-emerald-700: #003366;
+  --color-emerald-800: #002851;
+  --color-emerald-900: #001f3f;
+  --color-emerald-950: #001226;
+
+  /* Remap secondary/accent theme (amber) to Teacher Home Secondary School Maroon & Blue Accent */
+  --color-amber-50: #fdf2f5;
+  --color-amber-100: #fae5eb;
+  --color-amber-200: #f3c4d3;
+  --color-amber-300: #e796b0;
+  --color-amber-400: #66b2ff;
+  --color-amber-500: #b31b4d;
+  --color-amber-600: #990033;
+  --color-amber-700: #7a0029;
+  --color-amber-800: #5c001f;
+  --color-amber-900: #420016;
+  --color-amber-950: #29000d;
+
+  /* Align dark slate surfaces with Teacher Home Deep Navy */
+  --color-slate-800: #002b59;
+  --color-slate-900: #001f3f;
+  --color-slate-950: #001226;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Manrope", system-ui, -apple-system, sans-serif;
+}
+
+.font-display {
+  font-family: "Playfair Display", Georgia, serif;
 }
