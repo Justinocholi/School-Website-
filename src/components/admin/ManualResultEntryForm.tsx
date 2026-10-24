@@ -207,7 +207,8 @@ export function ManualResultEntryForm({
           >
             {terms.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} {t.is_active ? '— (Current Active Term)' : ''}
+                {t.name} ({t.session?.name || '2026/2027'}){' '}
+                {t.is_active ? '— (Current Active Term)' : ''}
               </option>
             ))}
           </select>

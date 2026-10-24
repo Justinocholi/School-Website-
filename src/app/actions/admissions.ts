@@ -1,7 +1,8 @@
 'use server';
 
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { recordAuditLog } from '@/lib/admin/admin-service';
 
 const enquirySchema = z.object({
   parent_name: z.string().min(2, 'Parent/Guardian full name is required'),
@@ -41,28 +42,44 @@ export async function submitAdmissionsEnquiry(
   }
 
   try {
-    const supabase = await createClient();
-    const { error } = await supabase.from('admissions_enquiries').insert({
-      parent_name: validation.data.parent_name,
-      student_name: validation.data.student_name,
-      email: validation.data.email,
-      phone: validation.data.phone,
-      target_class: validation.data.target_class,
-      message: validation.data.message || null,
-      status: 'pending',
-    });
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from('admissions_enquiries')
+      .insert({
+        parent_name: validation.data.parent_name,
+        student_name: validation.data.student_name,
+        email: validation.data.email,
+        phone: validation.data.phone,
+        target_class: validation.data.target_class,
+        message: validation.data.message || null,
+        status: 'pending',
+      })
+      .select('id')
+      .single();
 
     if (error) {
-      // In development or when Supabase is not connected, log and simulate success for the user
-      console.warn('Admissions enquiry insert warning:', error.message);
+      throw new Error(error.message);
     }
+
+    await recordAuditLog(
+      'SUBMIT_ADMISSIONS_ENQUIRY',
+      'admissions_enquiries',
+      data?.id || null,
+      {
+        parent_name: validation.data.parent_name,
+        student_name: validation.data.student_name,
+        target_class: validation.data.target_class,
+      }
+    );
 
     return {
       success: true,
-      message: 'Thank you! Your admissions enquiry has been received. Our admissions officer will contact you within 24 hours.',
+      message:
+        'Thank you! Your admissions enquiry has been saved. Our admissions officer will contact you within 24 hours.',
     };
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+    const errorMessage =
+      err instanceof Error ? err.message : 'An unexpected error occurred';
     return {
       success: false,
       message: `Failed to submit enquiry: ${errorMessage}`,

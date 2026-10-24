@@ -12,26 +12,33 @@ import {
   Clock,
   Printer,
 } from 'lucide-react';
-import { getAuthenticatedStudent, getStudentDashboardData } from '@/lib/student/student-service';
-import { getAdminTerms } from '@/lib/admin/admin-service';
+import {
+  getAuthenticatedStudent,
+  getStudentDashboardData,
+} from '@/lib/student/student-service';
+import { getAdminTerms, getAdminSessions } from '@/lib/admin/admin-service';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
   title: 'Student Dashboard',
-  description: 'View your student profile, academic session, announcements, and published results.',
+  description:
+    'View your student profile, academic session, announcements, and published results.',
 };
 
 export default async function StudentDashboardPage() {
   const student = await getAuthenticatedStudent();
   if (!student) return null;
 
-  const [dashboardData, terms] = await Promise.all([
+  const [dashboardData, terms, sessions] = await Promise.all([
     getStudentDashboardData(student.id),
     getAdminTerms(),
+    getAdminSessions(),
   ]);
 
+  const activeSession = sessions.find((s) => s.is_active) || sessions[0];
+  const activeSessionName = activeSession ? activeSession.name : '2026/2027';
   const activeTerm = terms.find((t) => t.is_active) || terms[0];
   const activeTermName = activeTerm ? activeTerm.name : 'First Term';
 
@@ -45,7 +52,9 @@ export default async function StudentDashboardPage() {
         <div className="relative z-10 max-w-2xl space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-800/80 border border-emerald-600/40 text-xs font-semibold text-amber-300">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>2026/2027 Academic Session &bull; {activeTermName}</span>
+            <span>
+              {activeSessionName} Academic Session &bull; {activeTermName}
+            </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Welcome back, {student.first_name}!
@@ -55,13 +64,20 @@ export default async function StudentDashboardPage() {
           </p>
           <div className="pt-2 flex flex-wrap gap-3">
             <Link href="/student/results">
-              <Button size="sm" className="bg-amber-400 text-gray-950 hover:bg-amber-500 font-bold">
+              <Button
+                size="sm"
+                className="bg-amber-400 text-gray-950 hover:bg-amber-500 font-bold"
+              >
                 <FileCheck2 className="w-4 h-4 mr-1.5" />
                 Check Published Results
               </Button>
             </Link>
             <Link href="/student/profile">
-              <Button size="sm" variant="outline" className="border-emerald-600 text-white hover:bg-emerald-800">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-emerald-600 text-white hover:bg-emerald-800"
+              >
                 View Student Profile
               </Button>
             </Link>
@@ -77,9 +93,15 @@ export default async function StudentDashboardPage() {
               <GraduationCap className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Admission ID</p>
-              <h3 className="text-lg font-bold font-mono text-gray-900">{student.student_id}</h3>
-              <p className="text-xs text-emerald-700 font-medium">{student.status.toUpperCase()}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Admission ID
+              </p>
+              <h3 className="text-lg font-bold font-mono text-gray-900">
+                {student.student_id}
+              </h3>
+              <p className="text-xs text-emerald-700 font-medium">
+                {student.status.toUpperCase()}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -90,8 +112,12 @@ export default async function StudentDashboardPage() {
               <BookOpen className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Current Class</p>
-              <h3 className="text-lg font-bold text-gray-900">{student.class_name}</h3>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Current Class
+              </p>
+              <h3 className="text-lg font-bold text-gray-900">
+                {student.class_name}
+              </h3>
               <p className="text-xs text-gray-500">Secondary Division</p>
             </div>
           </CardContent>
@@ -103,9 +129,15 @@ export default async function StudentDashboardPage() {
               <FileCheck2 className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Published Results</p>
-              <h3 className="text-lg font-bold text-gray-900">{dashboardData.resultsCount} Subjects</h3>
-              <p className="text-xs text-amber-700 font-medium">{activeTermName} 2026/2027</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Published Results
+              </p>
+              <h3 className="text-lg font-bold text-gray-900">
+                {dashboardData.resultsCount} Subjects
+              </h3>
+              <p className="text-xs text-amber-700 font-medium">
+                {activeTermName} ({activeSessionName})
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -116,9 +148,15 @@ export default async function StudentDashboardPage() {
               <Calendar className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Academic Term</p>
-              <h3 className="text-lg font-bold text-gray-900">{activeTermName}</h3>
-              <p className="text-xs text-gray-500">Session 2026/2027</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Academic Term
+              </p>
+              <h3 className="text-lg font-bold text-gray-900">
+                {activeTermName}
+              </h3>
+              <p className="text-xs text-gray-500">
+                Session {activeSessionName}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -130,8 +168,12 @@ export default async function StudentDashboardPage() {
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Published Term Results</h2>
-              <p className="text-xs text-gray-500">{activeTermName}, 2026/2027 Academic Session</p>
+              <h2 className="text-lg font-bold text-gray-900">
+                Published Term Results
+              </h2>
+              <p className="text-xs text-gray-500">
+                {activeTermName}, {activeSessionName} Academic Session
+              </p>
             </div>
             <Link href="/student/results">
               <Button variant="outline" size="sm" className="text-xs font-medium">
@@ -156,13 +198,19 @@ export default async function StudentDashboardPage() {
                 <tbody className="divide-y divide-gray-100 font-medium">
                   {dashboardData.recentResults.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-gray-500 text-xs">
+                      <td
+                        colSpan={6}
+                        className="py-8 text-center text-gray-500 text-xs"
+                      >
                         No examination results published for your portal account yet.
                       </td>
                     </tr>
                   ) : (
                     dashboardData.recentResults.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr
+                        key={item.id}
+                        className="hover:bg-slate-50/80 transition-colors"
+                      >
                         <td className="py-3.5 px-4 text-gray-900">
                           {item.subject?.name || 'Subject'}
                         </td>
@@ -173,7 +221,15 @@ export default async function StudentDashboardPage() {
                           {item.total_score}
                         </td>
                         <td className="py-3.5 px-4 text-center">
-                          <Badge variant={item.grade === 'A' ? 'success' : item.grade === 'B' ? 'info' : 'warning'}>
+                          <Badge
+                            variant={
+                              item.grade === 'A'
+                                ? 'success'
+                                : item.grade === 'B'
+                                  ? 'info'
+                                  : 'warning'
+                            }
+                          >
                             {item.grade}
                           </Badge>
                         </td>
@@ -182,7 +238,11 @@ export default async function StudentDashboardPage() {
                         </td>
                         <td className="py-3.5 px-4 text-right">
                           <Link href={`/student/results/${item.id}`}>
-                            <Button variant="ghost" size="sm" className="text-xs text-emerald-700 hover:text-emerald-900">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-emerald-700 hover:text-emerald-900"
+                            >
                               Breakdown
                             </Button>
                           </Link>
@@ -194,9 +254,14 @@ export default async function StudentDashboardPage() {
               </table>
             </div>
             <div className="p-4 bg-slate-50 border-t border-gray-100 flex items-center justify-between">
-              <span className="text-xs text-gray-500">Official Report Card format available</span>
+              <span className="text-xs text-gray-500">
+                Official Report Card format available
+              </span>
               <Link href="/student/results">
-                <Button size="sm" className="bg-emerald-800 text-white hover:bg-emerald-900 text-xs">
+                <Button
+                  size="sm"
+                  className="bg-emerald-800 text-white hover:bg-emerald-900 text-xs"
+                >
                   <Printer className="w-3.5 h-3.5 mr-1" />
                   Print Terminal Report Card
                 </Button>
@@ -210,23 +275,37 @@ export default async function StudentDashboardPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <Bell className="w-5 h-5 text-amber-600" />
-              Notices & Bulletins
+              Notices &amp; Bulletins
             </h2>
-            <Link href="/student/announcements" className="text-xs text-emerald-700 hover:underline font-semibold">
+            <Link
+              href="/student/announcements"
+              className="text-xs text-emerald-700 hover:underline font-semibold"
+            >
               View All
             </Link>
           </div>
 
           <div className="space-y-3">
             {dashboardData.announcements.map((a) => (
-              <Card key={a.id} className="border-gray-200 hover:border-emerald-300 transition-colors">
+              <Card
+                key={a.id}
+                className="border-gray-200 hover:border-emerald-300 transition-colors"
+              >
                 <CardContent className="p-4 space-y-1.5">
                   <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium">
                     <Clock className="w-3 h-3 text-emerald-700" />
-                    <span>{new Date(a.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                    <span>
+                      {new Date(a.published_at).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
                   </div>
                   <h3 className="font-bold text-sm text-gray-900">{a.title}</h3>
-                  <p className="text-xs text-gray-600 leading-relaxed">{a.summary}</p>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    {a.summary}
+                  </p>
                 </CardContent>
               </Card>
             ))}

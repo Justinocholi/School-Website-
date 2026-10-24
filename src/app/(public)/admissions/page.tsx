@@ -4,13 +4,19 @@ import { CheckCircle2, FileCheck, Calendar, HelpCircle, PhoneCall, Mail } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AdmissionsForm } from '@/components/public/AdmissionsForm';
+import { getAdminSessions } from '@/lib/admin/admin-service';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Admissions & Enrolment',
   description: 'Learn about the admissions process, entry requirements, scholarship opportunities, and submit an online admissions enquiry.',
 };
 
-export default function AdmissionsPage() {
+export default async function AdmissionsPage() {
+  const sessions = await getAdminSessions();
+  const activeSession = sessions.find((s) => s.is_active) || sessions[0];
+  const sessionName = activeSession?.name || '2026/2027';
   const steps = [
     {
       step: '01',
@@ -59,7 +65,7 @@ export default function AdmissionsPage() {
         {/* Header */}
         <div className="max-w-3xl">
           <Badge variant="warning" className="mb-3">
-            2026/2027 Admissions Open
+            {sessionName} Admissions Open
           </Badge>
           <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
             Join Our Community of Achievers

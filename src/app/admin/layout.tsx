@@ -17,12 +17,13 @@ import {
   Settings,
   Shield,
   ExternalLink,
-  ChevronRight,
+  Megaphone,
   LogOut,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { getAuthenticatedAdmin, logoutAdmin } from '@/app/actions/admin-auth';
+import { getAdminSessions, getAdminTerms } from '@/lib/admin/admin-service';
 
 export default async function AdminLayout({
   children,
@@ -35,33 +36,84 @@ export default async function AdminLayout({
     redirect('/admin-login');
   }
 
+  const [sessions, terms] = await Promise.all([
+    getAdminSessions(),
+    getAdminTerms(),
+  ]);
+
+  const activeSession = sessions.find((s) => s.is_active) || sessions[0];
+  const activeTerm = terms.find((t) => t.is_active) || terms[0];
+
   const isAdmin = staff.role === 'administrator';
 
   const navSections = [
     {
-      title: isAdmin ? 'Management' : `Class Management (${staff.assigned_class || 'Form Class'})`,
+      title: isAdmin
+        ? 'Management'
+        : `Class Management (${staff.assigned_class || 'Form Class'})`,
       items: [
         { name: 'Overview', href: '/admin', icon: LayoutDashboard },
         ...(isAdmin
-          ? [{ name: 'Staff & Teachers', href: '/admin/staff', icon: UserCheck }]
+          ? [
+              { name: 'Staff & Teachers', href: '/admin/staff', icon: UserCheck },
+              { name: 'Announcements', href: '/admin/announcements', icon: Megaphone },
+            ]
           : []),
-        { name: isAdmin ? 'All Students' : `Students (${staff.assigned_class || 'Class'})`, href: '/admin/students', icon: Users },
-        { name: 'Import Students', href: '/admin/students/import', icon: FileSpreadsheet },
-        { name: isAdmin ? 'Classes' : `My Class (${staff.assigned_class || 'Class'})`, href: '/admin/classes', icon: Layers },
+        {
+          name: isAdmin
+            ? 'All Students'
+            : `Students (${staff.assigned_class || 'Class'})`,
+          href: '/admin/students',
+          icon: Users,
+        },
+        {
+          name: 'Import Students',
+          href: '/admin/students/import',
+          icon: FileSpreadsheet,
+        },
+        {
+          name: isAdmin
+            ? 'Classes'
+            : `My Class (${staff.assigned_class || 'Class'})`,
+          href: '/admin/classes',
+          icon: Layers,
+        },
         { name: 'Subjects', href: '/admin/subjects', icon: BookOpen },
         ...(isAdmin
-          ? [{ name: 'Sessions & Terms', href: '/admin/academic-sessions', icon: Calendar }]
+          ? [
+              {
+                name: 'Sessions & Terms',
+                href: '/admin/academic-sessions',
+                icon: Calendar,
+              },
+            ]
           : []),
       ],
     },
     {
       title: 'Academic Results',
       items: [
-        { name: isAdmin ? 'All Results' : `Class Results (${staff.assigned_class || 'Class'})`, href: '/admin/results', icon: FileCheck2 },
+        {
+          name: isAdmin
+            ? 'All Results'
+            : `Class Results (${staff.assigned_class || 'Class'})`,
+          href: '/admin/results',
+          icon: FileCheck2,
+        },
         { name: 'Manual Entry', href: '/admin/results/entry', icon: PenTool },
-        { name: 'Import Results', href: '/admin/results/import', icon: FileSpreadsheet },
+        {
+          name: 'Import Results',
+          href: '/admin/results/import',
+          icon: FileSpreadsheet,
+        },
         ...(isAdmin
-          ? [{ name: 'Review & Publish', href: '/admin/results/review', icon: Send }]
+          ? [
+              {
+                name: 'Review & Publish',
+                href: '/admin/results/review',
+                icon: Send,
+              },
+            ]
           : []),
       ],
     },
@@ -71,7 +123,11 @@ export default async function AdminLayout({
             title: 'System & Governance',
             items: [
               { name: 'Audit Logs', href: '/admin/audit-logs', icon: History },
-              { name: 'Settings & Grading', href: '/admin/settings', icon: Settings },
+              {
+                name: 'Settings & Grading',
+                href: '/admin/settings',
+                icon: Settings,
+              },
             ],
           },
         ]
@@ -88,7 +144,9 @@ export default async function AdminLayout({
         .slice(0, 2)
         .join('')
         .toUpperCase()
-    : isAdmin ? 'AD' : 'TC';
+    : isAdmin
+      ? 'AD'
+      : 'TC';
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row selection:bg-emerald-200">
@@ -103,7 +161,9 @@ export default async function AdminLayout({
               {isAdmin ? 'Admin Portal' : 'Class Portal'}
             </span>
             <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
-              {isAdmin ? 'School Administrator' : `Form Teacher • ${staff.assigned_class || 'Class'}`}
+              {isAdmin
+                ? 'School Administrator'
+                : `Form Teacher • ${staff.assigned_class || 'Class'}`}
             </span>
           </div>
         </div>
@@ -156,10 +216,19 @@ export default async function AdminLayout({
         {/* Top Header */}
         <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 sticky top-0 z-20 shadow-xs">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-500">Academic Session:</span>
-            <Badge variant="success">2026/2027 (Active Term)</Badge>
-            <Badge variant={isAdmin ? 'default' : 'info'} className="text-[11px] hidden sm:inline-flex">
-              {isAdmin ? 'Full Admin Access' : `Form Teacher (${staff.assigned_class || 'Class'})`}
+            <span className="text-xs font-semibold text-gray-500">
+              Academic Session:
+            </span>
+            <Badge variant="success">
+              {activeSession?.name || '2026/2027'} ({activeTerm?.name || 'First Term'})
+            </Badge>
+            <Badge
+              variant={isAdmin ? 'default' : 'info'}
+              className="text-[11px] hidden sm:inline-flex"
+            >
+              {isAdmin
+                ? 'Full Admin Access'
+                : `Form Teacher (${staff.assigned_class || 'Class'})`}
             </Badge>
           </div>
 

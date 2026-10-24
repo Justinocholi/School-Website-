@@ -12,6 +12,7 @@ import {
   getAdminTerms,
   getAdminSessions,
   getAdminStudentById,
+  getAdminAnnouncements,
 } from '@/lib/admin/admin-service';
 
 export interface StudentAuthContext {
@@ -119,46 +120,23 @@ export async function getAuthenticatedStudent(): Promise<StudentAuthContext | nu
  * Retrieves student dashboard summary: published results, academic session, announcements.
  */
 export async function getStudentDashboardData(studentIdOrDbId: string) {
-  const supabaseAdmin = createAdminClient();
-
-  const [studentResults, { data: dbAnnouncements }] = await Promise.all([
+  const [studentResults, dbAnnouncements] = await Promise.all([
     getAdminResults({
       status: 'published',
       studentId: studentIdOrDbId,
     }),
-    supabaseAdmin
-      .from('announcements')
-      .select('id, title, summary, published_at')
-      .eq('status', 'published')
-      .in('target_audience', ['all', 'students'])
-      .order('published_at', { ascending: false })
-      .limit(5),
+    getAdminAnnouncements({
+      targetAudience: 'students',
+      status: 'published',
+    }),
   ]);
 
-  const announcements =
-    dbAnnouncements && dbAnnouncements.length > 0
-      ? dbAnnouncements.map((a) => ({
-          id: a.id,
-          title: a.title,
-          published_at: a.published_at || new Date().toISOString(),
-          summary: a.summary,
-        }))
-      : [
-          {
-            id: '1',
-            title: 'Academic Term Resumption & Assessment Policy',
-            published_at: '2026-09-07T08:00:00Z',
-            summary:
-              'All scholars are advised to inspect their terminal continuous assessments and examination scores.',
-          },
-          {
-            id: '2',
-            title: 'Science Fair & STEM Exhibition Submission Due',
-            published_at: '2026-10-01T08:00:00Z',
-            summary:
-              'Submit your project briefs to the STEM coordinator before Friday.',
-          },
-        ];
+  const announcements = dbAnnouncements.slice(0, 5).map((a) => ({
+    id: a.id,
+    title: a.title,
+    published_at: a.published_at || a.created_at || new Date().toISOString(),
+    summary: a.summary,
+  }));
 
   return {
     resultsCount: studentResults.length,
@@ -173,13 +151,15 @@ export async function getStudentDashboardData(studentIdOrDbId: string) {
  */
 export async function getStudentPublishedResults(
   studentDbIdOrId: string,
-  termId?: string
+  termId?: string,
+  sessionId?: string
 ): Promise<{
   results: ResultRecord[];
   performance: ReturnType<typeof calculateTermPerformance>;
   terms: TermRecord[];
   sessions: AcademicSession[];
   selectedTermId: string;
+  selectedSessionId: string;
 }> {
   const [terms, sessions, allStudentPublished] = await Promise.all([
     getAdminTerms(),
@@ -190,16 +170,29 @@ export async function getStudentPublishedResults(
     }),
   ]);
 
+  const activeSession = sessions.find((s) => s.is_active) || sessions[0];
   const activeTerm = terms.find((t: TermRecord) => t.is_active);
+
   let currentTermId =
     termId ||
     activeTerm?.id ||
     terms[0]?.id ||
     '33333333-3333-3333-3333-333333333331';
 
-  // If no explicit termId filter was requested in the URL and the active term has 0 results
-  // for this student, but another term has published results, auto-select the term with results.
-  if (!termId && allStudentPublished.length > 0) {
+  // If sessionId was explicitly passed without termId, select the first (or active) term in that session
+  if (sessionId && !termId) {
+    const sessionTerms = terms.filter((t) => t.academic_session_id === sessionId);
+    if (sessionTerms.length > 0) {
+      const hasResultsInSession = sessionTerms.find((st) =>
+        allStudentPublished.some((r) => r.term_id === st.id)
+      );
+      const activeInSession = sessionTerms.find((st) => st.is_active);
+      currentTermId =
+        hasResultsInSession?.id || activeInSession?.id || sessionTerms[0].id;
+    }
+  } else if (!termId && !sessionId && allStudentPublished.length > 0) {
+    // If no explicit filter was requested and active term has 0 results for this student,
+    // auto-select the term with published results.
     const hasInCurrent = allStudentPublished.some(
       (r) => r.term_id === currentTermId
     );
@@ -207,6 +200,14 @@ export async function getStudentPublishedResults(
       currentTermId = allStudentPublished[0].term_id;
     }
   }
+
+  const matchedTerm = terms.find((t) => t.id === currentTermId);
+  const currentSessionId =
+    matchedTerm?.academic_session_id ||
+    sessionId ||
+    activeSession?.id ||
+    sessions[0]?.id ||
+    '';
 
   const studentResults = allStudentPublished.filter(
     (r) => r.term_id === currentTermId
@@ -220,6 +221,7 @@ export async function getStudentPublishedResults(
     terms,
     sessions,
     selectedTermId: currentTermId,
+    selectedSessionId: currentSessionId,
   };
 }
 

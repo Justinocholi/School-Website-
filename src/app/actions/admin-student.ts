@@ -1,7 +1,11 @@
 'use server';
 
 import { z } from 'zod';
-import { addAdminStudent, deleteAdminStudent } from '@/lib/admin/admin-service';
+import {
+  addAdminStudent,
+  deleteAdminStudent,
+  updateAdminStudent,
+} from '@/lib/admin/admin-service';
 import { revalidatePath } from 'next/cache';
 
 const studentSchema = z.object({
@@ -69,6 +73,65 @@ export async function createStudentAction(
     return {
       success: false,
       message: errorMsg,
+    };
+  }
+}
+
+export async function updateStudentAction(
+  prevState: AdminStudentActionState | null,
+  formData: FormData
+): Promise<AdminStudentActionState> {
+  const studentId = ((formData.get('student_uuid') as string) || '').trim();
+  const firstName = ((formData.get('first_name') as string) || '').trim();
+  const lastName = ((formData.get('last_name') as string) || '').trim();
+  const otherNames = ((formData.get('other_names') as string) || '').trim();
+  const classId = ((formData.get('class_id') as string) || '').trim();
+  const status = ((formData.get('status') as string) || 'active') as
+    | 'active'
+    | 'inactive'
+    | 'graduated'
+    | 'suspended';
+  const newPassword = ((formData.get('new_password') as string) || '').trim();
+
+  if (!studentId || !firstName || !lastName) {
+    return {
+      success: false,
+      message: 'First name and surname are required.',
+    };
+  }
+
+  if (newPassword && newPassword.length < 6) {
+    return {
+      success: false,
+      message: 'New password must be at least 6 characters.',
+    };
+  }
+
+  try {
+    const updated = await updateAdminStudent(studentId, {
+      first_name: firstName,
+      last_name: lastName,
+      other_names: otherNames,
+      class_id: classId,
+      status,
+      new_password: newPassword || undefined,
+    });
+
+    revalidatePath('/admin/students');
+    revalidatePath(`/admin/students/${updated.id}`);
+    revalidatePath('/admin/classes');
+    revalidatePath('/student');
+    revalidatePath('/student/profile');
+
+    return {
+      success: true,
+      message: `Updated ${updated.first_name} ${updated.last_name} (${updated.student_id})${newPassword ? ` and reset portal password to "${newPassword}"` : ''}.`,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : 'Failed to update student profile.',
     };
   }
 }

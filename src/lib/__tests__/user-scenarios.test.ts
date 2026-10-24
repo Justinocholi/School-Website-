@@ -9,6 +9,13 @@ import {
   deleteAdminResult,
   getAdminTerms,
   setActiveAdminTerm,
+  getAdminSessions,
+  addAdminSession,
+  setActiveAdminSession,
+  deleteAdminSession,
+  addAdminAnnouncement,
+  getAdminAnnouncements,
+  deleteAdminAnnouncement,
   addAdminTeacher,
   getAdminStaff,
   deleteAdminStaff,
@@ -32,6 +39,7 @@ describe('Supabase End-to-End Scenarios: Student Creation, Review & Publication,
   afterAll(async () => {
     await Promise.allSettled([
       setActiveAdminTerm(firstTermId),
+      deleteAdminSession('2028/2029'),
       deleteAdminStudent(testStudentCode),
       deleteAdminStudent('GFS999'),
       deleteAdminSubject('PHE202'),
@@ -116,17 +124,43 @@ describe('Supabase End-to-End Scenarios: Student Creation, Review & Publication,
     expect(firstTermResults.results.length).toBe(0);
   });
 
-  it('Scenario 3: Switches active academic term in Supabase and verifies term persistence', async () => {
-    await setActiveAdminTerm(secondTermId);
+  it('Scenario 3: Creates a new Academic Session (with 3 auto-generated terms) and switches active sessions/terms in Supabase', async () => {
+    await deleteAdminSession('2028/2029');
 
+    // 1. Switch active term to Second Term
+    await setActiveAdminTerm(secondTermId);
     const terms = await getAdminTerms();
     const activeTerm = terms.find((t) => t.is_active);
     expect(activeTerm).toBeDefined();
     expect(activeTerm?.id).toBe(secondTermId);
     expect(activeTerm?.name).toBe('Second Term');
 
-    // Restore First Term
+    // 2. Create a new Academic Session (2028/2029) and transition the school to it
+    const newSession = await addAdminSession({
+      name: '2028/2029',
+      set_active: true,
+    });
+    expect(newSession.name).toBe('2028/2029');
+    expect(newSession.is_active).toBe(true);
+
+    // Verify 3 terms were auto-provisioned for 2028/2029 and First Term of 2028/2029 is now active
+    const newSessionTerms = await getAdminTerms(newSession.id);
+    expect(newSessionTerms.length).toBe(3);
+    expect(newSessionTerms.map((t) => t.name)).toEqual([
+      'First Term',
+      'Second Term',
+      'Third Term',
+    ]);
+    expect(newSessionTerms[0].is_active).toBe(true);
+
+    // 3. Switch back to 2026/2027 First Term and clean up 2028/2029
     await setActiveAdminTerm(firstTermId);
+    const sessionsAfterRestore = await getAdminSessions();
+    const activeAfterRestore = sessionsAfterRestore.find((s) => s.is_active);
+    expect(activeAfterRestore?.name).toBe('2026/2027');
+
+    const deletedSession = await deleteAdminSession(newSession.id);
+    expect(deletedSession).toBe(true);
   });
 
   it('Scenario 4: Admin creates a new class teacher in Supabase with assigned form class', async () => {
@@ -244,5 +278,31 @@ describe('Supabase End-to-End Scenarios: Student Creation, Review & Publication,
       studentId: testStudentCode,
     });
     expect(adminResultsAfter.some((r) => r.id === resToDelete.id)).toBe(false);
+
+    // 5. Announcement creation, visibility across Public & Student Dashboards, and deletion
+    const createdAnnouncement = await addAdminAnnouncement({
+      title: 'Special Session Transition Bulletin 2026',
+      summary: 'Important notice regarding next academic session registration.',
+      body: 'All students and parents are hereby informed of the upcoming session calendar.',
+      category: 'Academic',
+      target_audience: 'all',
+      status: 'published',
+    });
+    expect(createdAnnouncement.id).toBeDefined();
+
+    const publicFeed = await getAdminAnnouncements({
+      targetAudience: 'public',
+      status: 'published',
+    });
+    expect(publicFeed.some((a) => a.id === createdAnnouncement.id)).toBe(true);
+
+    const studentFeed = await getAdminAnnouncements({
+      targetAudience: 'students',
+      status: 'published',
+    });
+    expect(studentFeed.some((a) => a.id === createdAnnouncement.id)).toBe(true);
+
+    const deletedAnn = await deleteAdminAnnouncement(createdAnnouncement.id);
+    expect(deletedAnn).toBe(true);
   });
 });

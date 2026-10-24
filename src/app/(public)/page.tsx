@@ -7,7 +7,6 @@ import {
   Users,
   ArrowRight,
   ShieldCheck,
-  CheckCircle,
   Calendar,
   Sparkles,
   Search,
@@ -15,34 +14,25 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  getAdminAnnouncements,
+  getAdminSessions,
+  getAdminTerms,
+} from '@/lib/admin/admin-service';
 
-export default function HomePage() {
-  const announcements = [
-    {
-      id: '1',
-      title: 'First Term 2026/2027 Resumption & Academic Calendar',
-      date: 'Sep 7, 2026',
-      category: 'Academic',
-      summary: 'Academic activities for the new academic session have commenced. All students must have completed their registration.',
-      slug: 'resumption-date-2026-2027',
-    },
-    {
-      id: '2',
-      title: 'Admissions Open for JSS 1 and Senior Secondary Transfers',
-      date: 'Aug 28, 2026',
-      category: 'Admissions',
-      summary: 'Applications are now being received for prospective scholars into Junior and Senior Secondary classes.',
-      slug: 'admissions-open-2026-2027',
-    },
-    {
-      id: '3',
-      title: 'Annual Science Fair & Robotics Exhibition Announced',
-      date: 'Aug 15, 2026',
-      category: 'Events',
-      summary: 'Students across all levels will showcase their STEM inventions and scientific inquiry projects.',
-      slug: 'annual-science-fair-robotics-exhibition',
-    },
-  ];
+export const dynamic = 'force-dynamic';
+
+export default async function HomePage() {
+  const [announcements, sessions, terms] = await Promise.all([
+    getAdminAnnouncements({ targetAudience: 'public', status: 'published' }),
+    getAdminSessions(),
+    getAdminTerms(),
+  ]);
+
+  const activeSession = sessions.find((s) => s.is_active) || sessions[0];
+  const activeTerm = terms.find((t) => t.is_active) || terms[0];
+  const sessionName = activeSession?.name || '2026/2027';
+  const featuredAnnouncements = announcements.slice(0, 3);
 
   return (
     <div className="flex flex-col">
@@ -53,12 +43,14 @@ export default function HomePage() {
           <div className="max-w-3xl space-y-6">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-800/80 border border-emerald-600/50 text-emerald-300 text-xs sm:text-sm font-medium">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>2026/2027 Academic Session Portal</span>
+              <span>
+                {sessionName} Academic Session &bull; {activeTerm?.name || 'First Term'}
+              </span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.15]">
               Empowering Minds, <br />
-              <span className="text-amber-400">Inspiring Excellence</span> & Integrity.
+              <span className="text-amber-400">Inspiring Excellence</span> &amp; Integrity.
             </h1>
 
             <p className="text-base sm:text-lg text-emerald-100/90 leading-relaxed font-normal max-w-2xl">
@@ -68,19 +60,30 @@ export default function HomePage() {
             {/* CTAs */}
             <div className="pt-4 flex flex-wrap items-center gap-3 sm:gap-4">
               <Link href="/student-login">
-                <Button size="lg" className="bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold shadow-lg shadow-amber-500/20">
+                <Button
+                  size="lg"
+                  className="bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold shadow-lg shadow-amber-500/20"
+                >
                   <Search className="w-5 h-5 mr-1" />
                   Check Student Results
                 </Button>
               </Link>
               <Link href="/admissions">
-                <Button size="lg" variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/20">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+                >
                   Admissions Enquiry
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
               <Link href="/about">
-                <Button size="lg" variant="ghost" className="text-emerald-200 hover:text-white hover:bg-white/5">
+                <Button
+                  size="lg"
+                  variant="ghost"
+                  className="text-emerald-200 hover:text-white hover:bg-white/5"
+                >
                   Learn About Us
                 </Button>
               </Link>
@@ -96,14 +99,19 @@ export default function HomePage() {
                 <GraduationCap className="w-7 h-7" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Student Academic Results Portal</h3>
+                <h3 className="text-lg font-bold text-white">
+                  Student Academic Results Portal
+                </h3>
                 <p className="text-sm text-emerald-200">
                   Published term assessment scores and official terminal report cards are securely available.
                 </p>
               </div>
             </div>
             <Link href="/student-login" className="w-full md:w-auto">
-              <Button size="md" className="w-full md:w-auto bg-white text-emerald-900 hover:bg-emerald-50 font-semibold">
+              <Button
+                size="md"
+                className="w-full md:w-auto bg-white text-emerald-900 hover:bg-emerald-50 font-semibold"
+              >
                 Sign In With Student ID
                 <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
@@ -117,20 +125,36 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
             <div className="p-4 rounded-xl bg-slate-50 border border-gray-100">
-              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-800">100%</div>
-              <div className="text-xs sm:text-sm font-medium text-gray-600 mt-1">WAEC & BECE Pass Rate</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-800">
+                100%
+              </div>
+              <div className="text-xs sm:text-sm font-medium text-gray-600 mt-1">
+                WAEC &amp; BECE Pass Rate
+              </div>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 border border-gray-100">
-              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-800">15 : 1</div>
-              <div className="text-xs sm:text-sm font-medium text-gray-600 mt-1">Student-Teacher Ratio</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-800">
+                15 : 1
+              </div>
+              <div className="text-xs sm:text-sm font-medium text-gray-600 mt-1">
+                Student-Teacher Ratio
+              </div>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 border border-gray-100">
-              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-800">40+</div>
-              <div className="text-xs sm:text-sm font-medium text-gray-600 mt-1">Experienced Faculty</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-800">
+                40+
+              </div>
+              <div className="text-xs sm:text-sm font-medium text-gray-600 mt-1">
+                Experienced Faculty
+              </div>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 border border-gray-100">
-              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-800">25+</div>
-              <div className="text-xs sm:text-sm font-medium text-gray-600 mt-1">Years of Academic Heritage</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-800">
+                25+
+              </div>
+              <div className="text-xs sm:text-sm font-medium text-gray-600 mt-1">
+                Years of Academic Heritage
+              </div>
             </div>
           </div>
         </div>
@@ -157,7 +181,9 @@ export default function HomePage() {
                 <div className="w-12 h-12 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
                   <BookOpen className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">Rigorous Curriculum</h3>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Rigorous Curriculum
+                </h3>
                 <p className="text-sm text-gray-600 leading-relaxed">
                   Carefully balanced National and International curriculums that foster deep understanding and analytical reasoning.
                 </p>
@@ -169,7 +195,9 @@ export default function HomePage() {
                 <div className="w-12 h-12 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
                   <Award className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">STEM & Innovation</h3>
+                <h3 className="text-lg font-bold text-gray-900">
+                  STEM &amp; Innovation
+                </h3>
                 <p className="text-sm text-gray-600 leading-relaxed">
                   Equipped science laboratories, robotics clubs, and modern computing suites for hands-on experimentations.
                 </p>
@@ -181,7 +209,9 @@ export default function HomePage() {
                 <div className="w-12 h-12 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">Moral Character</h3>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Moral Character
+                </h3>
                 <p className="text-sm text-gray-600 leading-relaxed">
                   Instilling empathy, discipline, leadership, and ethical integrity as pillars of every scholar’s character.
                 </p>
@@ -193,7 +223,9 @@ export default function HomePage() {
                 <div className="w-12 h-12 rounded-lg bg-purple-100 text-purple-800 flex items-center justify-center">
                   <Users className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">Nurturing Community</h3>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Nurturing Community
+                </h3>
                 <p className="text-sm text-gray-600 leading-relaxed">
                   Supportive mentorship, dedicated guidance counselors, and vibrant co-curricular activities.
                 </p>
@@ -209,10 +241,10 @@ export default function HomePage() {
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
             <div>
               <Badge variant="warning" className="mb-2">
-                Updates & Notices
+                Updates &amp; Notices
               </Badge>
               <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
-                Latest News & Announcements
+                Latest News &amp; Announcements
               </h2>
             </div>
             <Link href="/news">
@@ -223,14 +255,23 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {announcements.map((item) => (
-              <Card key={item.id} className="flex flex-col justify-between hover:border-emerald-300 transition-colors">
+            {featuredAnnouncements.map((item) => (
+              <Card
+                key={item.id}
+                className="flex flex-col justify-between hover:border-emerald-300 transition-colors"
+              >
                 <CardContent className="p-6 space-y-3">
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <Badge variant="info">{item.category}</Badge>
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5" />
-                      {item.date}
+                      {new Date(
+                        item.published_at || item.created_at
+                      ).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
                     </span>
                   </div>
                   <h3 className="text-base font-bold text-gray-900 line-clamp-2">
@@ -241,7 +282,10 @@ export default function HomePage() {
                   </p>
                 </CardContent>
                 <div className="p-6 pt-0">
-                  <Link href={`/news/${item.slug}`} className="text-emerald-700 hover:text-emerald-800 text-sm font-semibold inline-flex items-center gap-1">
+                  <Link
+                    href={`/news/${item.slug}`}
+                    className="text-emerald-700 hover:text-emerald-800 text-sm font-semibold inline-flex items-center gap-1"
+                  >
                     Read Announcement <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
@@ -258,16 +302,23 @@ export default function HomePage() {
             Ready to Begin Your Journey at Greenfield?
           </h2>
           <p className="text-emerald-100 text-base sm:text-lg max-w-2xl mx-auto">
-            Discover our supportive community, outstanding facilities, and academic excellence. Applications for the 2026/2027 academic session are currently in progress.
+            Discover our supportive community, outstanding facilities, and academic excellence. Applications for the {sessionName} academic session are currently in progress.
           </p>
           <div className="pt-2 flex flex-wrap justify-center gap-4">
             <Link href="/admissions">
-              <Button size="lg" className="bg-amber-400 hover:bg-amber-500 text-gray-950 font-bold">
+              <Button
+                size="lg"
+                className="bg-amber-400 hover:bg-amber-500 text-gray-950 font-bold"
+              >
                 Apply for Admission
               </Button>
             </Link>
             <Link href="/contact">
-              <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10"
+              >
                 Book a Campus Tour
               </Button>
             </Link>

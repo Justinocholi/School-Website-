@@ -9,6 +9,7 @@ import {
   AuditLog,
   ImportJob,
   StaffRecord,
+  Announcement,
 } from '@/types/database.types';
 import { evaluateGrade } from '@/lib/grading/grading-engine';
 
@@ -511,12 +512,246 @@ export async function getAdminSessions(): Promise<AcademicSession[]> {
   return (data as AcademicSession[]) || [];
 }
 
-export async function getAdminTerms(): Promise<TermRecord[]> {
+export async function addAdminSession(data: {
+  name: string;
+  start_date?: string;
+  end_date?: string;
+  set_active?: boolean;
+}): Promise<AcademicSession> {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const cleanName = data.name.trim();
+  if (!cleanName) {
+    throw new Error('Academic session name is required (e.g. 2027/2028).');
+  }
+
+  const { data: existing } = await supabase
+    .from('academic_sessions')
+    .select('id')
+    .ilike('name', cleanName)
+    .maybeSingle();
+
+  if (existing) {
+    throw new Error(`Academic session "${cleanName}" already exists.`);
+  }
+
+  const startYearMatch = cleanName.match(/^(\d{4})/);
+  const baseYear = startYearMatch ? parseInt(startYearMatch[1], 10) : new Date().getFullYear();
+  const startDate = data.start_date?.trim() || `${baseYear}-09-01`;
+  const endDate = data.end_date?.trim() || `${baseYear + 1}-07-31`;
+
+  const { data: inserted, error } = await supabase
+    .from('academic_sessions')
+    .insert({
+      name: cleanName,
+      start_date: startDate,
+      end_date: endDate,
+      is_active: false,
+    })
+    .select('*')
+    .single();
+
+  if (error || !inserted) {
+    throw new Error(error?.message || 'Failed to create academic session.');
+  }
+
+  // Automatically provision the 3 standard terms for this academic session
+  const defaultTerms = [
+    {
+      academic_session_id: inserted.id,
+      name: 'First Term',
+      sequence_number: 1,
+      start_date: `${baseYear}-09-01`,
+      end_date: `${baseYear}-12-18`,
+      is_active: false,
+    },
+    {
+      academic_session_id: inserted.id,
+      name: 'Second Term',
+      sequence_number: 2,
+      start_date: `${baseYear + 1}-01-10`,
+      end_date: `${baseYear + 1}-04-15`,
+      is_active: false,
+    },
+    {
+      academic_session_id: inserted.id,
+      name: 'Third Term',
+      sequence_number: 3,
+      start_date: `${baseYear + 1}-04-28`,
+      end_date: `${baseYear + 1}-07-31`,
+      is_active: false,
+    },
+  ];
+
+  const { error: termErr } = await supabase.from('terms').insert(defaultTerms);
+  if (termErr) {
+    throw new Error(`Session created, but failed to generate terms: ${termErr.message}`);
+  }
+
+  if (data.set_active) {
+    await setActiveAdminSession(inserted.id);
+    inserted.is_active = true;
+  }
+
+  await recordAuditLog('CREATE_SESSION', 'academic_sessions', inserted.id, {
+    name: inserted.name,
+    start_date: inserted.start_date,
+    end_date: inserted.end_date,
+    set_active: Boolean(data.set_active),
+  });
+
+  return inserted as AcademicSession;
+}
+
+export async function setActiveAdminSession(sessionId: string) {
+  const supabase = createAdminClient();
+  const trimmed = sessionId.trim();
+
+  let sessionQuery = supabase.from('academic_sessions').select('*');
+  if (isUuid(trimmed)) {
+    sessionQuery = sessionQuery.eq('id', trimmed);
+  } else {
+    sessionQuery = sessionQuery.ilike('name', trimmed);
+  }
+
+  const { data: targetSession } = await sessionQuery.maybeSingle();
+  if (!targetSession) {
+    throw new Error('Academic session not found.');
+  }
+
+  const { error: deactErr } = await supabase
+    .from('academic_sessions')
+    .update({ is_active: false })
+    .neq('id', targetSession.id);
+
+  if (deactErr) {
+    throw new Error(`Failed to update sessions: ${deactErr.message}`);
+  }
+
+  const { error: actErr } = await supabase
+    .from('academic_sessions')
+    .update({ is_active: true })
+    .eq('id', targetSession.id);
+
+  if (actErr) {
+    throw new Error(`Failed to activate session: ${actErr.message}`);
+  }
+
+  // Ensure a term within this session is active (default to First Term)
+  const { data: sessionTerms } = await supabase
+    .from('terms')
+    .select('*')
+    .eq('academic_session_id', targetSession.id)
+    .order('sequence_number', { ascending: true });
+
+  let activeTermId: string | null = null;
+  if (sessionTerms && sessionTerms.length > 0) {
+    const alreadyActive = sessionTerms.find((t) => t.is_active);
+    const chosenTerm = alreadyActive || sessionTerms[0];
+    activeTermId = chosenTerm.id;
+
+    await supabase
+      .from('terms')
+      .update({ is_active: false })
+      .neq('id', chosenTerm.id);
+
+    await supabase
+      .from('terms')
+      .update({ is_active: true })
+      .eq('id', chosenTerm.id);
+  }
+
+  await supabase
+    .from('school_settings')
+    .update({
+      current_session_id: targetSession.id,
+      ...(activeTermId ? { current_term_id: activeTermId } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+
+  await recordAuditLog('SET_ACTIVE_SESSION', 'academic_sessions', targetSession.id, {
+    session_name: targetSession.name,
+    active_term_id: activeTermId,
+  });
+
+  return { success: true, activeSessionId: targetSession.id, activeTermId };
+}
+
+export async function deleteAdminSession(sessionId: string): Promise<boolean> {
+  const supabase = createAdminClient();
+  const trimmed = sessionId.trim();
+
+  let query = supabase.from('academic_sessions').select('*');
+  if (isUuid(trimmed)) {
+    query = query.eq('id', trimmed);
+  } else {
+    query = query.ilike('name', trimmed);
+  }
+
+  const { data: session } = await query.maybeSingle();
+  if (!session) {
+    return false;
+  }
+
+  const { count } = await supabase
+    .from('academic_sessions')
+    .select('id', { count: 'exact', head: true });
+
+  if ((count ?? 0) <= 1) {
+    throw new Error('Cannot delete the only remaining academic session.');
+  }
+
+  const { data: sessionTerms } = await supabase
+    .from('terms')
+    .select('id')
+    .eq('academic_session_id', session.id);
+
+  const termIds = (sessionTerms || []).map((t) => t.id);
+  if (termIds.length > 0) {
+    await supabase.from('results').delete().in('term_id', termIds);
+    await supabase.from('terms').delete().in('id', termIds);
+  }
+
+  const { error } = await supabase
+    .from('academic_sessions')
+    .delete()
+    .eq('id', session.id);
+
+  if (error) {
+    throw new Error(`Failed to delete session: ${error.message}`);
+  }
+
+  if (session.is_active) {
+    const { data: remaining } = await supabase
+      .from('academic_sessions')
+      .select('id')
+      .order('start_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (remaining?.id) {
+      await setActiveAdminSession(remaining.id);
+    }
+  }
+
+  await recordAuditLog('DELETE_SESSION', 'academic_sessions', session.id, {
+    name: session.name,
+  });
+
+  return true;
+}
+
+export async function getAdminTerms(sessionId?: string): Promise<TermRecord[]> {
+  const supabase = createAdminClient();
+  let query = supabase
     .from('terms')
     .select('*, session:academic_sessions(*)')
     .order('sequence_number', { ascending: true });
+
+  if (sessionId && isUuid(sessionId)) {
+    query = query.eq('academic_session_id', sessionId.trim());
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Failed to fetch academic terms: ${error.message}`);
@@ -527,6 +762,12 @@ export async function getAdminTerms(): Promise<TermRecord[]> {
 
 export async function setActiveAdminTerm(termId: string) {
   const supabase = createAdminClient();
+
+  const { data: targetTerm } = await supabase
+    .from('terms')
+    .select('id, academic_session_id, name')
+    .eq('id', termId)
+    .maybeSingle();
 
   const { error: deactivateErr } = await supabase
     .from('terms')
@@ -546,19 +787,40 @@ export async function setActiveAdminTerm(termId: string) {
     throw new Error(`Failed to activate term: ${activateErr.message}`);
   }
 
+  // Synchronize parent session as active session
+  if (targetTerm?.academic_session_id) {
+    await supabase
+      .from('academic_sessions')
+      .update({ is_active: false })
+      .neq('id', targetTerm.academic_session_id);
+
+    await supabase
+      .from('academic_sessions')
+      .update({ is_active: true })
+      .eq('id', targetTerm.academic_session_id);
+  }
+
   await supabase
     .from('school_settings')
-    .update({ current_term_id: termId, updated_at: new Date().toISOString() })
+    .update({
+      current_term_id: termId,
+      ...(targetTerm?.academic_session_id
+        ? { current_session_id: targetTerm.academic_session_id }
+        : {}),
+      updated_at: new Date().toISOString(),
+    })
     .neq('id', '00000000-0000-0000-0000-000000000000');
 
   await recordAuditLog('SET_ACTIVE_TERM', 'terms', termId, {
     active_term_id: termId,
+    academic_session_id: targetTerm?.academic_session_id || null,
   });
 
   return { success: true };
 }
 
 export async function getAdminResults(filters?: {
+  sessionId?: string;
   termId?: string;
   classId?: string;
   subjectId?: string;
@@ -575,7 +837,7 @@ export async function getAdminResults(filters?: {
       student:students(id, user_id, student_id, first_name, last_name, other_names, class_id, admission_date, status, created_at, updated_at),
       subject:subjects(id, name, code, status, created_at),
       class:classes(id, name, level, status, created_at),
-      term:terms(id, name, sequence_number, is_active, academic_session_id),
+      term:terms(id, name, sequence_number, is_active, academic_session_id, session:academic_sessions(id, name, is_active)),
       scores:result_scores(id, result_id, score, assessment_component_id, component:assessment_components(id, name, code, maximum_score, sequence_number, is_active))
     `
     )
@@ -597,6 +859,11 @@ export async function getAdminResults(filters?: {
   }
 
   let list = ((data as any[]) || []).map(normalizeResultRecord);
+
+  if (filters?.sessionId && isUuid(filters.sessionId)) {
+    const sessTrim = filters.sessionId.trim();
+    list = list.filter((r) => r.term?.academic_session_id === sessTrim);
+  }
 
   if (filters?.classId && filters.classId.trim()) {
     const cTrim = filters.classId.trim();
@@ -1227,3 +1494,324 @@ export async function deleteAdminResult(resultId: string): Promise<boolean> {
 
   return true;
 }
+
+const DEFAULT_ANNOUNCEMENTS_SEED = [
+  {
+    title: 'First Term 2026/2027 Resumption & Academic Calendar Guidelines',
+    slug: 'resumption-date-2026-2027',
+    summary:
+      'Detailed schedule for boarding students check-in, academic orientation, and commencement of classroom lectures for the First Term.',
+    body: 'We are delighted to welcome all returning scholars and newly enrolled students to Greenfield International College for the commencement of the 2026/2027 academic session.\n\nBoarding students are required to report to their designated hostels on Sunday, September 6th, 2026, between 10:00 AM and 4:00 PM. Housemasters and medical staff will be on ground to verify clearances and inspect student kits.\n\nDay students are expected on campus promptly by 7:30 AM on Monday, September 7th, 2026, for the inaugural session assembly.\n\nStudents are reminded that full compliance with the official school uniform, haircut standards, and textbooks is compulsory. We wish all our students an inspiring and fruitful academic year ahead.',
+    category: 'Academic',
+    target_audience: 'all',
+    status: 'published',
+    published_at: '2026-09-07T08:00:00Z',
+  },
+  {
+    title: 'Admissions Open for JSS 1 and Senior Secondary Transfers (2026/2027)',
+    slug: 'admissions-open-2026-2027',
+    summary:
+      'Greenfield International College is now accepting applications for prospective scholars into Junior and Senior Secondary classes.',
+    body: 'Greenfield International College is pleased to announce that applications for admission into Junior Secondary School (JSS 1, 2) and Senior Secondary School (SS 1) are ongoing.\n\nProspective parents are encouraged to complete the online enquiry form on our website or visit the admissions office on campus to purchase the registration dossier.\n\nThe entrance examination assesses foundational competence in Mathematics, English Language, and Quantitative Reasoning.\n\nSelected candidates will be invited for an interactive interview with the admissions committee.',
+    category: 'Admissions',
+    target_audience: 'all',
+    status: 'published',
+    published_at: '2026-08-28T08:00:00Z',
+  },
+  {
+    title: 'Annual Science Fair & Robotics Exhibition Announced for October',
+    slug: 'annual-science-fair-robotics-exhibition',
+    summary:
+      'Scholars will present projects covering sustainable energy, artificial intelligence models, and automated agriculture.',
+    body: 'The annual Greenfield Science & Innovation Fair will take place from October 14th to 16th, 2026, at the College Multi-Purpose Auditorium.\n\nScholars across all grade levels will display project prototypes covering robotics, renewable energy solutions, environmental sustainability, and algorithmic modeling.\n\nParents and educational stakeholders are cordially invited to attend the grand exhibition on the final day.',
+    category: 'Events',
+    target_audience: 'all',
+    status: 'published',
+    published_at: '2026-08-15T08:00:00Z',
+  },
+  {
+    title: 'Continuous Assessment (CA) Timetable & Portal Result Verification',
+    slug: 'ca-timetable-portal-verification',
+    summary:
+      'The schedule for continuous assessment tests has been synchronized with your student portal. Ensure you verify your registered subjects.',
+    body: 'The schedule for the mid-term continuous assessment tests has been posted on the departmental notice boards and synchronized with your portal calendar. All students are expected to report punctually.\n\nContinuous Assessment accounts for 30% of your terminal grade, while the Terminal Examination accounts for 70%.',
+    category: 'Academic',
+    target_audience: 'students',
+    status: 'published',
+    published_at: '2026-10-12T08:00:00Z',
+  },
+];
+
+let announcementsSeededCheck = false;
+
+async function ensureDefaultAnnouncementsSeeded() {
+  if (announcementsSeededCheck) return;
+  announcementsSeededCheck = true;
+
+  try {
+    const supabase = createAdminClient();
+    const { count } = await supabase
+      .from('announcements')
+      .select('id', { count: 'exact', head: true });
+
+    if ((count ?? 0) === 0) {
+      await supabase
+        .from('announcements')
+        .upsert(DEFAULT_ANNOUNCEMENTS_SEED, { onConflict: 'slug' });
+    }
+  } catch {
+    // Non-fatal
+  }
+}
+
+export async function getAdminAnnouncements(filters?: {
+  targetAudience?: 'all' | 'public' | 'students';
+  status?: 'published' | 'draft';
+}): Promise<Announcement[]> {
+  await ensureDefaultAnnouncementsSeeded();
+
+  const supabase = createAdminClient();
+  let query = supabase
+    .from('announcements')
+    .select('*')
+    .order('published_at', { ascending: false });
+
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+
+  if (filters?.targetAudience === 'public') {
+    query = query.in('target_audience', ['all', 'public']);
+  } else if (filters?.targetAudience === 'students') {
+    query = query.in('target_audience', ['all', 'students']);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Failed to fetch announcements: ${error.message}`);
+  }
+
+  return (data as Announcement[]) || [];
+}
+
+export async function getAnnouncementBySlug(
+  slugOrId: string
+): Promise<Announcement | null> {
+  await ensureDefaultAnnouncementsSeeded();
+
+  const supabase = createAdminClient();
+  const trimmed = slugOrId.trim();
+  if (!trimmed) return null;
+
+  let query = supabase.from('announcements').select('*');
+  if (isUuid(trimmed)) {
+    query = query.eq('id', trimmed);
+  } else {
+    query = query.eq('slug', trimmed);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error || !data) return null;
+  return data as Announcement;
+}
+
+export async function addAdminAnnouncement(data: {
+  title: string;
+  summary: string;
+  body: string;
+  category?: string;
+  target_audience?: 'all' | 'public' | 'students';
+  status?: 'published' | 'draft';
+}): Promise<Announcement> {
+  const supabase = createAdminClient();
+  const cleanTitle = data.title.trim();
+  const cleanSummary = data.summary.trim();
+  const cleanBody = data.body.trim();
+  const category = data.category?.trim() || 'General';
+  const targetAudience = data.target_audience || 'all';
+  const status = data.status || 'published';
+
+  const baseSlug = cleanTitle
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  const uniqueSlug = `${baseSlug || 'announcement'}-${Date.now().toString(36)}`;
+
+  const nowIso = new Date().toISOString();
+  const { data: inserted, error } = await supabase
+    .from('announcements')
+    .insert({
+      title: cleanTitle,
+      slug: uniqueSlug,
+      summary: cleanSummary,
+      body: cleanBody,
+      category,
+      target_audience: targetAudience,
+      status,
+      published_at: nowIso,
+    })
+    .select('*')
+    .single();
+
+  if (error || !inserted) {
+    throw new Error(error?.message || 'Failed to publish announcement.');
+  }
+
+  await recordAuditLog('CREATE_ANNOUNCEMENT', 'announcements', inserted.id, {
+    title: inserted.title,
+    category: inserted.category,
+    target_audience: inserted.target_audience,
+    status: inserted.status,
+  });
+
+  return inserted as Announcement;
+}
+
+export async function updateAnnouncementStatus(
+  announcementId: string,
+  status: 'published' | 'draft'
+): Promise<Announcement> {
+  const supabase = createAdminClient();
+  const { data: updated, error } = await supabase
+    .from('announcements')
+    .update({
+      status,
+      ...(status === 'published'
+        ? { published_at: new Date().toISOString() }
+        : {}),
+    })
+    .eq('id', announcementId.trim())
+    .select('*')
+    .single();
+
+  if (error || !updated) {
+    throw new Error(error?.message || 'Failed to update announcement status.');
+  }
+
+  await recordAuditLog('UPDATE_ANNOUNCEMENT', 'announcements', updated.id, {
+    title: updated.title,
+    status: updated.status,
+  });
+
+  return updated as Announcement;
+}
+
+export async function deleteAdminAnnouncement(
+  announcementId: string
+): Promise<boolean> {
+  const supabase = createAdminClient();
+  const trimmed = announcementId.trim();
+
+  let query = supabase.from('announcements').select('*');
+  if (isUuid(trimmed)) {
+    query = query.eq('id', trimmed);
+  } else {
+    query = query.eq('slug', trimmed);
+  }
+
+  const { data: existing } = await query.maybeSingle();
+  if (!existing) {
+    return false;
+  }
+
+  const { error } = await supabase
+    .from('announcements')
+    .delete()
+    .eq('id', existing.id);
+
+  if (error) {
+    throw new Error(`Failed to delete announcement: ${error.message}`);
+  }
+
+  await recordAuditLog('DELETE_ANNOUNCEMENT', 'announcements', existing.id, {
+    title: existing.title,
+    category: existing.category,
+  });
+
+  return true;
+}
+
+export async function updateAdminStudent(
+  studentIdOrUuid: string,
+  data: {
+    first_name: string;
+    last_name: string;
+    other_names?: string;
+    class_id?: string;
+    status?: 'active' | 'inactive' | 'graduated' | 'suspended';
+    new_password?: string;
+  }
+): Promise<StudentRecord> {
+  const supabase = createAdminClient();
+  const student = await getAdminStudentById(studentIdOrUuid);
+  if (!student) {
+    throw new Error('Student record not found.');
+  }
+
+  let resolvedClassId = student.class_id || null;
+  if (data.class_id && data.class_id.trim()) {
+    if (isUuid(data.class_id)) {
+      resolvedClassId = data.class_id.trim();
+    } else {
+      const { data: cls } = await supabase
+        .from('classes')
+        .select('id')
+        .ilike('name', data.class_id.trim())
+        .maybeSingle();
+      resolvedClassId = cls?.id || resolvedClassId;
+    }
+  }
+
+  const firstName = data.first_name.trim();
+  const lastName = data.last_name.trim();
+  const otherNames = data.other_names?.trim() || null;
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  if (student.user_id) {
+    const authUpdates: Record<string, unknown> = {
+      user_metadata: {
+        display_name: fullName,
+        role: 'student',
+        student_id: student.student_id,
+      },
+    };
+    if (data.new_password && data.new_password.trim().length >= 6) {
+      authUpdates.password = data.new_password.trim();
+      authUpdates.email_confirm = true;
+    }
+    await supabase.auth.admin.updateUserById(student.user_id, authUpdates);
+    await supabase
+      .from('profiles')
+      .update({ display_name: fullName, updated_at: new Date().toISOString() })
+      .eq('id', student.user_id);
+  }
+
+  const { data: updated, error } = await supabase
+    .from('students')
+    .update({
+      first_name: firstName,
+      last_name: lastName,
+      other_names: otherNames,
+      class_id: resolvedClassId,
+      status: data.status || student.status || 'active',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', student.id)
+    .select('*, class:classes(id, name, level, status, created_at)')
+    .single();
+
+  if (error || !updated) {
+    throw new Error(error?.message || 'Failed to update student profile.');
+  }
+
+  await recordAuditLog('UPDATE_STUDENT', 'students', student.id, {
+    student_id: student.student_id,
+    name: fullName,
+    class: updated.class?.name || null,
+    password_reset: Boolean(data.new_password && data.new_password.trim().length >= 6),
+  });
+
+  return updated as unknown as StudentRecord;
+}
+

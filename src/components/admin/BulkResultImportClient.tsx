@@ -48,7 +48,9 @@ export function BulkResultImportClient({
 
   const [selectedClass, setSelectedClass] = useState<string>(teacherClass?.id || classes[0]?.id || '');
   const [selectedSubject, setSelectedSubject] = useState<string>(subjects[0]?.id || '');
-  const [selectedTerm, setSelectedTerm] = useState<string>(terms[0]?.id || '');
+  const [selectedTerm, setSelectedTerm] = useState<string>(
+    terms.find((t) => t.is_active)?.id || terms[0]?.id || ''
+  );
 
   const [file, setFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -168,7 +170,8 @@ export function BulkResultImportClient({
               >
                 {terms.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name} (2026/2027)
+                    {t.name} ({t.session?.name || '2026/2027'})
+                    {t.is_active ? ' — Active' : ''}
                   </option>
                 ))}
               </select>
