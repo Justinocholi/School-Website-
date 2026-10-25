@@ -43,15 +43,17 @@ export function CreateAnnouncementForm() {
           </label>
           <select
             name="category"
-            defaultValue="Academic"
+            defaultValue="Announcements"
             className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
           >
+            <option value="Announcements">Announcements</option>
             <option value="Academic">Academic</option>
             <option value="Admissions">Admissions</option>
-            <option value="Events">Events & STEM</option>
+            <option value="Events">Events</option>
+            <option value="Achievements">Achievements</option>
             <option value="Examinations">Examinations</option>
-            <option value="General">General Bulletin</option>
-            <option value="Sports">Sports & Extracurricular</option>
+            <option value="Sports">Sports</option>
+            <option value="General">General</option>
           </select>
         </div>
 

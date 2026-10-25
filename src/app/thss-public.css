@@ -27,7 +27,7 @@
     color: var(--text);
     background: var(--white);
     line-height: 1.6;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
   .font-display { font-family: 'Playfair Display', Georgia, serif; }
   .thss-site img { max-width: 100%; display: block; }
@@ -218,7 +218,7 @@
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
   }
   .thss-site .btn-dark:hover { background: #001529; transform: translateY(-2px); }
-  @media (max-width: 768px) { .header-actions .thss-site .btn { display: none; } }
+  @media (max-width: 768px) { .header-actions .btn { display: none; } }
 
   .menu-toggle {
     width: 44px;
@@ -264,7 +264,7 @@
   }
   .mobile-nav-link:hover, .mobile-nav-link.active { background: var(--blue-pale); color: var(--navy); }
   .mobile-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
-  .mobile-actions .thss-site .btn { justify-content: center; }
+  .mobile-actions .btn { justify-content: center; }
 
   /* Hero */
   .hero {
@@ -1378,3 +1378,203 @@
   .bulletin-sidebar h3 { font-size: 20px; font-weight: 800; color: var(--navy); margin-bottom: 12px; }
   .bulletin-sidebar p { font-size: 14px; color: var(--text-light); line-height: 1.6; margin-bottom: 20px; }
   @media (max-width: 900px) { .bulletin-detail-grid { grid-template-columns: 1fr; } .bulletin-sidebar { position: static; } }
+
+
+/* ------------------------------------------------------------------
+   Responsive Grid Classes for Quality Assurance, Academics, Admissions
+------------------------------------------------------------------ */
+.thss-split {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 60px;
+}
+.thss-split.align-center {
+  align-items: center;
+}
+.thss-split-even {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+}
+.thss-split-even.wide-gap {
+  gap: 80px;
+}
+.thss-docs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 24px;
+}
+.thss-quote-block {
+  border-left: 4px solid var(--blue-accent);
+  padding-left: 32px;
+}
+.thss-calendar-card {
+  background: var(--blue-pale);
+  padding: 40px;
+  border-radius: var(--radius-lg);
+}
+.thss-calendar-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(0,51,102,0.1);
+}
+.thss-calendar-row:last-child {
+  border-bottom: none;
+}
+.thss-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 48px 24px;
+  border: 1px dashed rgba(0,51,102,0.2);
+  border-radius: var(--radius-lg);
+  color: var(--text-light);
+  font-size: 15px;
+  background: var(--blue-pale);
+}
+
+/* ------------------------------------------------------------------
+   Mobile Header: LOCKED at top of viewport, room for school name
+------------------------------------------------------------------ */
+@media (max-width: 1024px) {
+  /* Hide 'Enroll Now' and 'Check Result' buttons on mobile, giving room for school name */
+  .header-actions {
+    display: none !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .thss-split,
+  .thss-split.align-center,
+  .thss-split-even,
+  .thss-split-even.wide-gap {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Lock header at top of viewport */
+  .header {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    z-index: 1000 !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    box-shadow: 0 2px 12px rgba(0, 51, 102, 0.08) !important;
+  }
+  
+  /* Add top padding to main content to account for fixed 72px header */
+  .thss-site main {
+    padding-top: 72px;
+  }
+
+  .header-inner {
+    height: 72px;
+    gap: 8px;
+  }
+
+  .mobile-menu {
+    top: 72px !important;
+    position: fixed !important;
+  }
+
+  .logo {
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+  .logo-crest {
+    width: 44px;
+    height: 48px;
+    flex-shrink: 0;
+  }
+  .logo-text {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .logo-name {
+    font-size: 17px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .logo-sub {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  .menu-toggle {
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  /* Section padding on mobile */
+  .section {
+    padding: 56px 0;
+  }
+  .thss-site .container {
+    padding: 0 18px;
+  }
+
+  /* Quality Assurance section on mobile */
+  .thss-quote-block {
+    padding-left: 20px;
+    border-left-width: 3px;
+  }
+  .thss-quote-block p:first-child {
+    font-size: 15px !important;
+    line-height: 1.7 !important;
+  }
+
+  /* Assessment & Academic Calendar on mobile (Assessment UP, Calendar DOWN) */
+  .thss-calendar-card {
+    padding: 24px 18px;
+  }
+  .thss-calendar-card h3 {
+    font-size: 24px !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* Eligibility & What to bring on mobile */
+  .thss-docs-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  /* FAQ section on mobile */
+  .faq-question {
+    font-size: 15px;
+    padding: 18px 0;
+    gap: 12px;
+  }
+  .faq-answer p {
+    padding-right: 0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .faq-item.open .faq-answer {
+    max-height: 600px;
+    padding-bottom: 20px;
+  }
+}
+
+@media (max-width: 390px) {
+  .logo-name {
+    font-size: 15px;
+  }
+  .logo-crest {
+    width: 38px;
+    height: 42px;
+  }
+  .logo-sub {
+    font-size: 9px;
+  }
+}

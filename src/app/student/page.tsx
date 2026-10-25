@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Clock,
   Printer,
+  User,
 } from 'lucide-react';
 import {
   getAuthenticatedStudent,
@@ -75,9 +76,9 @@ export default async function StudentDashboardPage() {
             <Link href="/student/profile">
               <Button
                 size="sm"
-                variant="outline"
-                className="border-emerald-600 text-white hover:bg-emerald-800"
+                className="bg-white text-[#003366] hover:bg-[#e9f5ff] font-bold border border-white shadow-xs"
               >
+                <User className="w-4 h-4 mr-1.5 text-[#003366]" />
                 View Student Profile
               </Button>
             </Link>

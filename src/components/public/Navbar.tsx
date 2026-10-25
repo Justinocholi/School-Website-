@@ -74,6 +74,9 @@ export function Navbar() {
             <Link href="/#admissions" className="nav-link">
               Admissions
             </Link>
+            <Link href="/#bulletin" className="nav-link">
+              Bulletin
+            </Link>
             <Link href="/#management" className="nav-link">
               Management
             </Link>
@@ -142,6 +145,13 @@ export function Navbar() {
             onClick={() => setMobileOpen(false)}
           >
             Admissions
+          </Link>
+          <Link
+            href="/#bulletin"
+            className="mobile-nav-link"
+            onClick={() => setMobileOpen(false)}
+          >
+            School Bulletin
           </Link>
           <Link
             href="/#management"
